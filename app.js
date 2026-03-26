@@ -614,6 +614,44 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
   scheduleAutoSave();
 });
 
+// ── 페이지 삭제 ──
+document.getElementById('delPageBtn').addEventListener('click', () => {
+  const tabs = document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)');
+  if (tabs.length <= 1) {
+    showToast('마지막 페이지는 삭제할 수 없습니다.', 'error');
+    return;
+  }
+  if (!confirm(`${currentPage}페이지를 삭제할까요?`)) return;
+
+  // 현재 탭 제거
+  const activeTab = document.querySelector(`.tab[data-page="${currentPage}"]`);
+  if (activeTab) activeTab.remove();
+  delete pageData[currentPage];
+
+  // 남은 탭 번호 재정렬
+  const remaining = [...document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)')]
+    .sort((a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page));
+  const newPageData = {};
+  remaining.forEach((tab, i) => {
+    const oldNum = parseInt(tab.dataset.page);
+    const newNum = i + 1;
+    tab.dataset.page = newNum;
+    tab.textContent = newNum;
+    if (pageData[oldNum]) newPageData[newNum] = pageData[oldNum];
+  });
+  Object.keys(pageData).forEach(k => delete pageData[k]);
+  Object.assign(pageData, newPageData);
+
+  // 이전 페이지로 이동
+  const prevNum = Math.min(currentPage, remaining.length);
+  currentPage = prevNum;
+  remaining.forEach(tab => {
+    tab.classList.toggle('active', parseInt(tab.dataset.page) === currentPage);
+  });
+  loadPageRows(pageData[currentPage] || []);
+  scheduleAutoSave();
+});
+
 // ════════════════════════════════════
 // 페이지 탭 (멀티페이지)
 // ════════════════════════════════════

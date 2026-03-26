@@ -434,6 +434,23 @@ body {
   background: #e8f0fe;
 }
 
+/* ── 페이지 삭제 버튼 ── */
+.del-page-btn {
+  width: 100%;
+  height: 36px;
+  border: 1.5px dashed #ff3b30;
+  border-radius: 8px;
+  background: none;
+  color: #ff3b30;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.del-page-btn:active {
+  background: #fff0ee;
+}
+
 /* ── 하단 툴바 ── */
 .bottom-toolbar {
   height: 64px;

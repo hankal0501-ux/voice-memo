@@ -938,7 +938,9 @@ async function handlePhotoFile(e) {
   }
 
   const id = Date.now().toString();
-  const imgName = file.name.replace(/\.[^/.]+$/, ''); // 확장자 제거
+  const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
+  localStorage.setItem('imgCounter', imgCounter);
+  const imgName = String(imgCounter);
   localStorage.setItem('img_' + id, compressed);
   localStorage.setItem('img_name_' + id, imgName);
 

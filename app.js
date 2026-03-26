@@ -950,6 +950,8 @@ document.getElementById('scAddCol').addEventListener('click', () => {
   const head = document.getElementById('sanChulHeadRow');
   const th = document.createElement('th');
   th.contentEditable = 'true';
+  th.setAttribute('inputmode', 'text');
+  th.spellcheck = false;
   head.appendChild(th);
   document.querySelectorAll('#sanChulBody tr').forEach(tr => {
     const td = document.createElement('td');

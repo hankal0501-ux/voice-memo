@@ -437,12 +437,12 @@ body {
 /* ── 페이지 삭제 버튼 ── */
 .del-page-btn {
   width: 100%;
-  height: 36px;
+  height: 44px;
   border: 1.5px dashed #ff3b30;
   border-radius: 8px;
   background: none;
   color: #ff3b30;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;

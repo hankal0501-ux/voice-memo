@@ -945,17 +945,23 @@ function getSanTableData() {
 
 function loadSanPageData(data) {
   const headers = data?.headers || DEFAULT_SAN_HEADERS;
-  const rows    = data?.rows;
+  const colCount = headers.length;
   const headRow = document.getElementById('sanChulHeadRow');
   headRow.innerHTML = headers.map(h =>
     `<th contenteditable="true" inputmode="text" spellcheck="false">${h}</th>`
   ).join('');
   const sanBody = document.getElementById('sanChulBody');
-  const emptyRow = () => `<tr>${headers.map(() => `<td contenteditable="true"></td>`).join('')}</tr>`;
-  if (rows && rows.length > 0 && rows[0].length > 0) {
-    sanBody.innerHTML = rows.map(row =>
-      `<tr>${row.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`
-    ).join('');
+  const emptyRow = () =>
+    `<tr>${Array(colCount).fill('<td contenteditable="true"></td>').join('')}</tr>`;
+
+  const rows = data?.rows;
+  const hasData = rows && rows.length > 0 && rows.some(r => r.length > 0);
+  if (hasData) {
+    // 모든 행의 셀 수를 헤더에 맞춰 정규화
+    sanBody.innerHTML = rows.map(row => {
+      const cells = Array(colCount).fill('').map((_, i) => row[i] ?? '');
+      return `<tr>${cells.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`;
+    }).join('');
   } else {
     sanBody.innerHTML = Array(3).fill(null).map(emptyRow).join('');
   }

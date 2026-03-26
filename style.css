@@ -89,19 +89,13 @@ body {
 
 .doc-name {
   flex: 1;
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 600;
   color: #1c1c1e;
   outline: none;
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid transparent;
-  transition: border-color 0.2s;
-}
-
-.doc-name:focus {
-  border-color: #007aff;
-  background: #f2f2f7;
+  border: none;
 }
 
 .header-buttons {

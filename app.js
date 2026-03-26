@@ -394,7 +394,7 @@ document.getElementById('saveDeviceBtn').addEventListener('click', async () => {
   const hasSanData = [...sanBody].some(tr =>
     [...tr.querySelectorAll('td')].some(td => td.textContent.trim())
   );
-  const sanBiz = document.getElementById('sanChulBizName').value.trim() || biz;
+  const sanBiz = biz;
   if (hasSanData) {
     const headers = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
     const rows = [...sanBody].map(tr => [...tr.querySelectorAll('td')].map(td => td.textContent));

@@ -5,7 +5,6 @@ const STORAGE_KEY = 'voiceMemo_data';
 
 function saveToStorage() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
-  const bizName = document.getElementById('bizName').value.trim();
   const rows = [];
   document.querySelectorAll('#tableBody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')].map(td => {
@@ -22,7 +21,7 @@ function saveToStorage() {
     [...tr.querySelectorAll('td')].map(td => td.textContent)
   );
 
-  const data = { title, bizName, rows, sanHeaders, sanRows };
+  const data = { title, rows, sanHeaders, sanRows };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -32,7 +31,6 @@ function loadFromStorage() {
   try {
     const data = JSON.parse(raw);
     if (data.title) document.getElementById('docName').textContent = data.title;
-    if (data.bizName) document.getElementById('bizName').value = data.bizName;
 
     // 메인 테이블 복원
     if (data.rows && data.rows.length) {
@@ -355,7 +353,7 @@ document.getElementById('saveDeviceBtn').addEventListener('click', async () => {
   document.getElementById('saveModal').classList.remove('open');
   showToast('📦 저장 파일 만드는 중...');
 
-  const biz = document.getElementById('bizName').value.trim() || document.getElementById('docName').textContent.trim() || '문서';
+  const biz = document.getElementById('docName').textContent.trim() || '문서';
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
   const zipName = `${biz}-${dateStr}`;
@@ -827,9 +825,6 @@ document.getElementById('sanChulBtn').addEventListener('click', () => {
     btn.textContent = '메모';
     btn.style.background = '#007aff';
     btn.style.borderColor = '#007aff';
-    // 사업장명 자동 입력
-    const biz = document.getElementById('bizName').value.trim();
-    if (biz) document.getElementById('sanChulBizName') && null; // 별도 입력 없음, bizName 공유
   } else {
     memoArea.style.display   = 'flex';
     sanArea.style.display    = 'none';

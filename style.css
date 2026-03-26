@@ -196,16 +196,6 @@ body {
   font-weight: 400;
 }
 
-/* ── 사업장명 입력 ── */
-.bizname-input {
-  width: 90px;
-  font-size: 12px;
-  padding: 4px 6px;
-  border: 1px solid #d1d1d6;
-  border-radius: 8px;
-  outline: none;
-  flex-shrink: 0;
-}
 
 /* ── 산출 탭 버튼 ── */
 .tab.sanchul-tab {

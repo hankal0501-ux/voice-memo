@@ -81,16 +81,30 @@ async function restoreOnLoad() {
     const saved = await idbGet('data', 'autosave');
     if (saved) {
       document.getElementById('docName').textContent = saved.title || '문서 제목';
+      // 메모 페이지 복원
       if (saved.pageData) {
         Object.assign(pageData, saved.pageData);
         currentPage = saved.currentPage || 1;
         restoreTabs(pageData, currentPage);
         await loadPageRows(pageData[currentPage] || []);
       } else if (saved.rows && saved.rows.length) {
-        // 구버전 단일페이지 데이터 호환
         pageData[1] = saved.rows;
         currentPage = 1;
         await loadPageRows(pageData[1]);
+      }
+      // 산출 데이터 복원 (메모와 독립적으로)
+      if (saved.sanRows && saved.sanRows.length) {
+        if (saved.sanHeaders) {
+          const headRow = document.getElementById('sanChulHeadRow');
+          headRow.innerHTML = saved.sanHeaders.map(h => `<th contenteditable="true">${h}</th>`).join('');
+        }
+        const sanBody = document.getElementById('sanChulBody');
+        sanBody.innerHTML = '';
+        saved.sanRows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = row.map(cell => `<td contenteditable="true">${cell}</td>`).join('');
+          sanBody.appendChild(tr);
+        });
       }
       return;
     }
@@ -155,7 +169,11 @@ async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
     pageData[currentPage] = getTableRows();
-    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, savedAt: Date.now() });
+    const sanHeaders = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
+    const sanRows = [...document.querySelectorAll('#sanChulBody tr')].map(tr =>
+      [...tr.querySelectorAll('td')].map(td => td.textContent)
+    );
+    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, sanHeaders, sanRows, savedAt: Date.now() });
 
     // 이미지도 IndexedDB에 저장
     document.querySelectorAll('.cell-photo-icon').forEach(async el => {

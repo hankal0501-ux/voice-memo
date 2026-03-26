@@ -5,15 +5,8 @@ const STORAGE_KEY = 'voiceMemo_data';
 
 function saveToStorage() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
-  const rows = [];
-  document.querySelectorAll('#tableBody tr').forEach(tr => {
-    const cells = [...tr.querySelectorAll('td')].map(td => {
-      const img = td.querySelector('.cell-photo-icon');
-      if (img) return '__IMG__' + img.dataset.imgId;
-      return td.textContent;
-    });
-    rows.push(cells);
-  });
+  // 현재 페이지 데이터를 pageData에 반영
+  pageData[currentPage] = getTableRows();
 
   // 산출 데이터도 함께 저장
   const sanHeaders = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
@@ -21,7 +14,7 @@ function saveToStorage() {
     [...tr.querySelectorAll('td')].map(td => td.textContent)
   );
 
-  const data = { title, rows, sanHeaders, sanRows };
+  const data = { title, pageData, currentPage, sanHeaders, sanRows };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -32,23 +25,16 @@ function loadFromStorage() {
     const data = JSON.parse(raw);
     if (data.title) document.getElementById('docName').textContent = data.title;
 
-    // 메인 테이블 복원
-    if (data.rows && data.rows.length) {
-      const tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
-      data.rows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = row.map(cell => {
-          if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
-            const id = cell.replace('__IMG__', '');
-            const src = localStorage.getItem('img_' + id) || '';
-            return `<td contenteditable="false" style="text-align:center">${makeCellImg(id, src)}</td>`;
-          }
-          return `<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`;
-        }).join('');
-        tbody.appendChild(tr);
-      });
-      bindImgClick();
+    // 멀티페이지 복원
+    if (data.pageData) {
+      Object.assign(pageData, data.pageData);
+      currentPage = data.currentPage || 1;
+      restoreTabs(pageData, currentPage);
+      loadPageRows(pageData[currentPage] || []);
+    } else if (data.rows && data.rows.length) {
+      // 구버전 단일페이지 호환
+      pageData[1] = data.rows;
+      loadPageRows(pageData[1]);
     }
 
     // 산출 테이블 복원
@@ -68,32 +54,44 @@ function loadFromStorage() {
   } catch {}
 }
 
+// 탭 복원 헬퍼: pageData의 키 수만큼 탭 생성
+function restoreTabs(savedPageData, savedCurrentPage) {
+  const tabs = document.querySelector('.tabs-scroll');
+  const addBtn = document.getElementById('addPageBtn');
+  const keys = Object.keys(savedPageData).map(Number).sort((a, b) => a - b);
+  // HTML에 이미 탭 1,2가 있으므로 3 이상부터 생성
+  keys.forEach(k => {
+    if (k <= 2) return;
+    const newTab = document.createElement('button');
+    newTab.className = 'tab';
+    newTab.dataset.page = k;
+    newTab.textContent = k;
+    bindTabClick(newTab);
+    tabs.insertBefore(newTab, addBtn);
+  });
+  // 활성 탭 표시
+  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.page) === savedCurrentPage);
+  });
+}
+
 // 페이지 로드 시 복원 (IndexedDB 우선, 없으면 localStorage)
 async function restoreOnLoad() {
   try {
     const saved = await idbGet('data', 'autosave');
-    if (saved && saved.rows && saved.rows.length) {
+    if (saved) {
       document.getElementById('docName').textContent = saved.title || '문서 제목';
-      const tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
-      for (const row of saved.rows) {
-        const tr = document.createElement('tr');
-        const cells = [];
-        for (const cell of row) {
-          if (cell.startsWith('__IMG__')) {
-            const id = cell.replace('__IMG__', '');
-            const imgData = await idbGet('images', id);
-            const src = imgData?.src || '';
-            const name = imgData?.name || '사진';
-            cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name)}</td>`);
-          } else {
-            cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
-          }
-        }
-        tr.innerHTML = cells.join('');
-        tbody.appendChild(tr);
+      if (saved.pageData) {
+        Object.assign(pageData, saved.pageData);
+        currentPage = saved.currentPage || 1;
+        restoreTabs(pageData, currentPage);
+        await loadPageRows(pageData[currentPage] || []);
+      } else if (saved.rows && saved.rows.length) {
+        // 구버전 단일페이지 데이터 호환
+        pageData[1] = saved.rows;
+        currentPage = 1;
+        await loadPageRows(pageData[1]);
       }
-      bindImgClick();
       return;
     }
   } catch {}
@@ -156,16 +154,8 @@ async function idbGet(store, key) {
 async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
-    const rows = [];
-    document.querySelectorAll('#tableBody tr').forEach(tr => {
-      const cells = [...tr.querySelectorAll('td')].map(td => {
-        const img = td.querySelector('.cell-photo-icon');
-        if (img) return '__IMG__' + img.dataset.imgId;
-        return td.textContent;
-      });
-      rows.push(cells);
-    });
-    await idbSet('data', 'autosave', { title, rows, savedAt: Date.now() });
+    pageData[currentPage] = getTableRows();
+    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, savedAt: Date.now() });
 
     // 이미지도 IndexedDB에 저장
     document.querySelectorAll('.cell-photo-icon').forEach(async el => {
@@ -217,18 +207,17 @@ function showToast(msg, type = 'info') {
 document.getElementById('newBtn').addEventListener('click', () => {
   if (!confirm('현재 내용을 지우고 새로 시작할까요?')) return;
   document.getElementById('docName').textContent = '문서 제목';
-  const tbody = document.getElementById('tableBody');
-  tbody.innerHTML = '';
-  for (let i = 0; i < 5; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
-      <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
-      <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
-      <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
-    `;
-    tbody.appendChild(tr);
-  }
+  // 페이지 데이터 초기화
+  Object.keys(pageData).forEach(k => delete pageData[k]);
+  currentPage = 1;
+  // 탭을 1, 2만 남기기
+  document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').forEach(tab => {
+    if (parseInt(tab.dataset.page) > 2) tab.remove();
+  });
+  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.page) === 1);
+  });
+  loadPageRows([]);
   localStorage.removeItem(STORAGE_KEY);
   showToast('✅ 새 문서가 시작됐습니다.');
 });
@@ -319,13 +308,14 @@ function loadTxtContent(text) {
 // ════════════════════════════════════
 function buildTxtContent() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
-  const rows = [];
-  document.querySelectorAll('#tableBody tr').forEach(tr => {
-    const cells = [...tr.querySelectorAll('td')].map(td => td.textContent);
-    rows.push(cells);
-  });
+  // 현재 페이지 반영
+  pageData[currentPage] = getTableRows();
   const lines = [`제목:${title}`, ''];
-  rows.forEach(row => lines.push(row.join('\t')));
+  const pageNums = Object.keys(pageData).map(Number).sort((a, b) => a - b);
+  pageNums.forEach(pg => {
+    if (pageNums.length > 1) lines.push(`=== ${pg}페이지 ===`);
+    (pageData[pg] || []).forEach(row => lines.push(row.join('\t')));
+  });
   return { title, text: lines.join('\n') };
 }
 
@@ -586,29 +576,92 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
 });
 
 // ════════════════════════════════════
-// 페이지 탭
+// 페이지 탭 (멀티페이지)
 // ════════════════════════════════════
-document.querySelectorAll('.tab:not(.add-tab)').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
+let currentPage = 1;
+const pageData = {}; // { pageNum: rows[] }
+
+function getTableRows() {
+  const rows = [];
+  document.querySelectorAll('#tableBody tr').forEach(tr => {
+    const cells = [...tr.querySelectorAll('td')].map(td => {
+      const img = td.querySelector('.cell-photo-icon');
+      if (img) return '__IMG__' + img.dataset.imgId;
+      return td.textContent;
+    });
+    rows.push(cells);
   });
-});
+  return rows;
+}
+
+async function loadPageRows(rows) {
+  const tbody = document.getElementById('tableBody');
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = Array(5).fill(0).map(() =>
+      `<tr>
+        <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+        <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+        <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+        <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+      </tr>`
+    ).join('');
+    return;
+  }
+  tbody.innerHTML = '';
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+    const cells = [];
+    for (const cell of row) {
+      if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
+        const id = cell.replace('__IMG__', '');
+        const imgData = await idbGet('images', id).catch(() => null);
+        const src = imgData?.src || localStorage.getItem('img_' + id) || '';
+        const name = imgData?.name || localStorage.getItem('img_name_' + id) || '사진';
+        cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name)}</td>`);
+      } else {
+        cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
+      }
+    }
+    tr.innerHTML = cells.join('');
+    tbody.appendChild(tr);
+  }
+  bindImgClick();
+}
+
+function switchToPage(pageNum) {
+  // 현재 페이지 데이터 저장
+  pageData[currentPage] = getTableRows();
+  currentPage = pageNum;
+  // 새 페이지 데이터 로드
+  loadPageRows(pageData[currentPage] || []);
+  scheduleAutoSave();
+}
+
+function bindTabClick(tab) {
+  tab.addEventListener('click', () => {
+    const pg = parseInt(tab.dataset.page);
+    if (pg === currentPage) return;
+    document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    switchToPage(pg);
+  });
+}
+
+document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').forEach(bindTabClick);
 
 document.getElementById('addPageBtn').addEventListener('click', () => {
   const tabs = document.querySelector('.tabs-scroll');
   const addBtn = document.getElementById('addPageBtn');
-  const count = document.querySelectorAll('.tab:not(.add-tab)').length + 1;
+  const count = document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').length + 1;
   const newTab = document.createElement('button');
   newTab.className = 'tab';
   newTab.dataset.page = count;
   newTab.textContent = count;
-  newTab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    newTab.classList.add('active');
-  });
+  bindTabClick(newTab);
   tabs.insertBefore(newTab, addBtn);
-  newTab.click();
+  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => t.classList.remove('active'));
+  newTab.classList.add('active');
+  switchToPage(count);
 });
 
 // ════════════════════════════════════

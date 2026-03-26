@@ -70,7 +70,7 @@ function restoreTabs(savedPageData, savedCurrentPage) {
     tabs.insertBefore(newTab, addBtn);
   });
   // 활성 탭 표시
-  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => {
+  document.querySelectorAll('.tab').forEach(t => {
     t.classList.toggle('active', parseInt(t.dataset.page) === savedCurrentPage);
   });
 }
@@ -229,10 +229,10 @@ document.getElementById('newBtn').addEventListener('click', () => {
   Object.keys(pageData).forEach(k => delete pageData[k]);
   currentPage = 1;
   // 탭을 1, 2만 남기기
-  document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').forEach(tab => {
+  document.querySelectorAll('.tab:not(.add-tab)').forEach(tab => {
     if (parseInt(tab.dataset.page) > 2) tab.remove();
   });
-  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => {
+  document.querySelectorAll('.tab').forEach(t => {
     t.classList.toggle('active', parseInt(t.dataset.page) === 1);
   });
   loadPageRows([]);
@@ -616,7 +616,7 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
 
 // ── 페이지 삭제 ──
 document.getElementById('delPageBtn').addEventListener('click', async () => {
-  const allTabs = [...document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)')];
+  const allTabs = [...document.querySelectorAll('.tab:not(.add-tab)')];
   if (allTabs.length <= 1) {
     showToast('마지막 페이지는 삭제할 수 없습니다.', 'error');
     return;
@@ -630,7 +630,7 @@ document.getElementById('delPageBtn').addEventListener('click', async () => {
   delete pageData[deletedPage];
 
   // 남은 탭 번호 재정렬
-  const remaining = [...document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)')]
+  const remaining = [...document.querySelectorAll('.tab:not(.add-tab)')]
     .sort((a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page));
   const newPageData = {};
   remaining.forEach((tab, i) => {
@@ -719,25 +719,25 @@ function bindTabClick(tab) {
   tab.addEventListener('click', () => {
     const pg = parseInt(tab.dataset.page);
     if (pg === currentPage) return;
-    document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     switchToPage(pg);
   });
 }
 
-document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').forEach(bindTabClick);
+document.querySelectorAll('.tab:not(.add-tab)').forEach(bindTabClick);
 
 document.getElementById('addPageBtn').addEventListener('click', () => {
   const tabs = document.querySelector('.tabs-scroll');
   const addBtn = document.getElementById('addPageBtn');
-  const count = document.querySelectorAll('.tab:not(.add-tab):not(.sanchul-tab)').length + 1;
+  const count = document.querySelectorAll('.tab:not(.add-tab)').length + 1;
   const newTab = document.createElement('button');
   newTab.className = 'tab';
   newTab.dataset.page = count;
   newTab.textContent = count;
   bindTabClick(newTab);
   tabs.insertBefore(newTab, addBtn);
-  document.querySelectorAll('.tab:not(.sanchul-tab)').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   newTab.classList.add('active');
   switchToPage(count);
 });
@@ -954,30 +954,31 @@ docName.addEventListener('keydown', (e) => {
 let isSanChulMode = false;
 let lastFocusedSanCell = null;
 
-// 산출 모드 전환
-document.getElementById('sanChulBtn').addEventListener('click', () => {
-  isSanChulMode = !isSanChulMode;
+function setMode(sanChul) {
+  isSanChulMode = sanChul;
   const memoArea   = document.querySelector('.memo-area');
   const sanArea    = document.getElementById('sanChulArea');
   const sanToolbar = document.getElementById('sanChulToolbar');
-  const btn        = document.getElementById('sanChulBtn');
+  const pageTabsRow = document.getElementById('pageTabsRow');
 
-  if (isSanChulMode) {
-    memoArea.style.display   = 'none';
-    sanArea.style.display    = 'flex';
-    sanToolbar.style.display = 'flex';
-    btn.textContent = '메모';
-    btn.style.background = '#007aff';
-    btn.style.borderColor = '#007aff';
+  document.getElementById('memoModeBtn').classList.toggle('active', !sanChul);
+  document.getElementById('sanChulBtn').classList.toggle('active', sanChul);
+
+  if (sanChul) {
+    memoArea.style.display    = 'none';
+    sanArea.style.display     = 'flex';
+    sanToolbar.style.display  = 'flex';
+    pageTabsRow.style.display = 'none';
   } else {
-    memoArea.style.display   = 'flex';
-    sanArea.style.display    = 'none';
-    sanToolbar.style.display = 'none';
-    btn.textContent = '산출';
-    btn.style.background = '#ff3b30';
-    btn.style.borderColor = '#ff3b30';
+    memoArea.style.display    = 'flex';
+    sanArea.style.display     = 'none';
+    sanToolbar.style.display  = 'none';
+    pageTabsRow.style.display = 'flex';
   }
-});
+}
+
+document.getElementById('memoModeBtn').addEventListener('click', () => setMode(false));
+document.getElementById('sanChulBtn').addEventListener('click',  () => setMode(true));
 
 // 산출 셀 포커스 기억
 document.getElementById('sanChulArea').addEventListener('focusin', (e) => {

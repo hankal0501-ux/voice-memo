@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>음성 메모장</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#007aff" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="phone-frame">
+
+
+    <!-- 앱 헤더 -->
+    <div class="app-header">
+      <div class="doc-name" id="docName" contenteditable="true" inputmode="text" spellcheck="false">문서 제목</div>
+      <input class="bizname-input" id="bizName" type="text" placeholder="사업장명" inputmode="text" />
+      <span class="autosave-indicator" id="autoSaveIndicator"></span>
+      <div class="header-buttons">
+        <button class="icon-btn" id="newBtn" title="새로 시작">🆕</button>
+        <button class="icon-btn" id="loadBtn" title="불러오기">📂</button>
+        <input type="file" id="fileInput" accept=".txt,.zip" style="display:none" />
+        <button class="icon-btn" id="saveBtn" title="저장">💾</button>
+        <button class="record-btn" id="recordBtn" title="음성입력">🎤</button>
+      </div>
+    </div>
+
+    <!-- 페이지 탭 -->
+    <div class="page-tabs">
+      <div class="tabs-scroll">
+        <button class="tab active" data-page="1">1</button>
+        <button class="tab" data-page="2">2</button>
+        <button class="tab add-tab" id="addPageBtn">＋</button>
+      </div>
+      <button class="tab sanchul-tab" id="sanChulBtn">산출</button>
+    </div>
+
+    <!-- 산출 툴바 (산출 모드에서만 표시) -->
+    <div class="sanchul-toolbar" id="sanChulToolbar" style="display:none">
+      <button class="sanchul-row-btn add" id="scPlus">＋</button>
+      <button class="sanchul-row-btn del" id="scMinus">－</button>
+      <div style="flex:1"></div>
+      <button class="sanchul-col-btn" id="scAddRow">행추가</button>
+      <button class="sanchul-col-btn" id="scAddCol">열추가</button>
+    </div>
+
+    <!-- 메모 영역 -->
+    <div class="memo-area">
+      <div class="table-wrapper">
+        <table class="memo-table" id="memoTable">
+          <thead>
+            <tr>
+              <th class="col-floor">층</th>
+              <th class="col-loc">위치</th>
+              <th class="col-content">점검내용</th>
+              <th class="col-result">점검결과</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+            </tr>
+            <tr>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+            </tr>
+            <tr>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+            </tr>
+            <tr>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+            </tr>
+            <tr>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+              <td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- 행 추가 버튼 -->
+      <button class="add-row-btn" id="addRowBtn">＋ 행 추가</button>
+    </div>
+
+    <!-- 산출 영역 (산출 모드에서만 표시) -->
+    <div class="memo-area" id="sanChulArea" style="display:none">
+      <div class="sanchul-table-wrap">
+        <table class="sanchul-table" id="sanChulTable">
+          <thead>
+            <tr id="sanChulHeadRow">
+              <th contenteditable="true">층</th>
+              <th contenteditable="true">소화기</th>
+              <th contenteditable="true">주방자동소화장치</th>
+              <th contenteditable="true">점검결과</th>
+              <th contenteditable="true">피난기구</th>
+            </tr>
+          </thead>
+          <tbody id="sanChulBody">
+            <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+            <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+            <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 하단 툴바 -->
+    <div class="bottom-toolbar">
+      <button class="tool-btn" id="undoBtn" title="실행취소">↩</button>
+      <button class="tool-btn" id="boldBtn" title="굵게">B</button>
+      <button class="tool-btn" id="photoBtn" title="사진 삽입">📷</button>
+      <button class="tool-btn" id="shareBtn" title="공유">↗</button>
+      <button class="tool-btn" id="menuBtn" title="더보기">⋯</button>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" />
+
+    <!-- 이미지 전체보기 모달 -->
+    <div class="modal-overlay" id="imgModal">
+      <div class="img-modal-inner">
+        <div id="imgModalName" class="img-modal-name"></div>
+        <img id="imgModalSrc" src="" alt="" />
+        <button class="img-modal-close" id="imgModalClose">✕</button>
+      </div>
+    </div>
+
+    <!-- 홈 바 -->
+    <div class="home-bar"></div>
+
+    <!-- 저장 모달 -->
+    <div class="modal-overlay" id="saveModal">
+      <div class="modal-sheet">
+        <div class="modal-title">저장 방법 선택</div>
+        <button class="modal-btn" id="saveKakaoBtn">
+          <span class="modal-icon">💬</span> 카카오톡 공유
+        </button>
+        <button class="modal-btn" id="saveDeviceBtn">
+          <span class="modal-icon">📥</span> 기기에 저장
+        </button>
+        <button class="modal-cancel" id="saveModalClose">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 폴더 선택 모달 -->
+  <div class="modal-overlay" id="folderModal">
+    <div class="modal-sheet">
+      <div class="modal-title" id="folderModalTitle">저장 폴더 선택</div>
+      <div id="folderBreadcrumb" class="folder-breadcrumb"></div>
+      <div id="folderList" class="folder-list"></div>
+      <button class="modal-btn" id="folderConfirmBtn" style="display:none">
+        <span class="modal-icon">✅</span> 이 폴더에 저장
+      </button>
+      <button class="modal-cancel" id="folderModalClose">취소</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -31,14 +31,23 @@
       <button class="mode-tab" id="sanChulBtn">산출</button>
     </div>
 
-    <!-- 페이지 탭 (2행, 메모 모드일 때만) -->
+    <!-- 메모 페이지 탭 -->
     <div class="page-tabs" id="pageTabsRow">
-      <div class="tabs-scroll">
+      <div class="tabs-scroll" id="memoTabsScroll">
         <button class="tab active" data-page="1">1</button>
         <button class="tab" data-page="2">2</button>
         <button class="tab add-tab" id="addPageBtn">＋</button>
       </div>
       <button class="del-page-icon-btn" id="delPageBtn" title="페이지 삭제">🗑</button>
+    </div>
+
+    <!-- 산출 페이지 탭 -->
+    <div class="page-tabs" id="sanPageTabsRow" style="display:none">
+      <div class="tabs-scroll" id="sanTabsScroll">
+        <button class="tab sc-tab active" data-sc-page="1">1</button>
+        <button class="tab add-tab" id="addSanPageBtn">＋</button>
+      </div>
+      <button class="del-page-icon-btn" id="delSanPageBtn" title="산출 페이지 삭제">🗑</button>
     </div>
 
     <!-- 산출 툴바 (산출 모드에서만 표시) -->

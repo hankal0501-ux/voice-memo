@@ -8,13 +8,8 @@ function saveToStorage() {
   // 현재 페이지 데이터를 pageData에 반영
   pageData[currentPage] = getTableRows();
 
-  // 산출 데이터도 함께 저장
-  const sanHeaders = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
-  const sanRows = [...document.querySelectorAll('#sanChulBody tr')].map(tr =>
-    [...tr.querySelectorAll('td')].map(td => td.textContent)
-  );
-
-  const data = { title, pageData, currentPage, sanHeaders, sanRows };
+  sanPageData[currentSanPage] = getSanTableData();
+  const data = { title, pageData, currentPage, sanPageData: { ...sanPageData }, currentSanPage };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -37,19 +32,15 @@ function loadFromStorage() {
       loadPageRows(pageData[1]);
     }
 
-    // 산출 테이블 복원
-    if (data.sanRows && data.sanRows.length) {
-      if (data.sanHeaders) {
-        const headRow = document.getElementById('sanChulHeadRow');
-        headRow.innerHTML = data.sanHeaders.map(h => `<th contenteditable="true">${h}</th>`).join('');
-      }
-      const sanBody = document.getElementById('sanChulBody');
-      sanBody.innerHTML = '';
-      data.sanRows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = row.map(cell => `<td contenteditable="true">${cell}</td>`).join('');
-        sanBody.appendChild(tr);
-      });
+    // 산출 멀티페이지 복원
+    if (data.sanPageData) {
+      Object.assign(sanPageData, data.sanPageData);
+      currentSanPage = data.currentSanPage || 1;
+      restoreSanTabs(sanPageData, currentSanPage);
+      loadSanPageData(sanPageData[currentSanPage]);
+    } else if (data.sanRows) {
+      sanPageData[1] = { headers: data.sanHeaders || DEFAULT_SAN_HEADERS, rows: data.sanRows };
+      loadSanPageData(sanPageData[1]);
     }
   } catch {}
 }
@@ -75,6 +66,24 @@ function restoreTabs(savedPageData, savedCurrentPage) {
   });
 }
 
+function restoreSanTabs(savedSanPageData, savedCurrentSanPage) {
+  const scroll = document.getElementById('sanTabsScroll');
+  const addBtn = document.getElementById('addSanPageBtn');
+  const keys = Object.keys(savedSanPageData).map(Number).sort((a, b) => a - b);
+  keys.forEach(k => {
+    if (k <= 1) return; // HTML에 이미 1탭 있음
+    const newTab = document.createElement('button');
+    newTab.className = 'tab sc-tab';
+    newTab.dataset.scPage = k;
+    newTab.textContent = k;
+    bindSanTabClick(newTab);
+    scroll.insertBefore(newTab, addBtn);
+  });
+  document.querySelectorAll('.sc-tab').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.scPage) === savedCurrentSanPage);
+  });
+}
+
 // 페이지 로드 시 복원 (IndexedDB 우선, 없으면 localStorage)
 async function restoreOnLoad() {
   try {
@@ -92,19 +101,16 @@ async function restoreOnLoad() {
         currentPage = 1;
         await loadPageRows(pageData[1]);
       }
-      // 산출 데이터 복원 (메모와 독립적으로)
-      if (saved.sanRows && saved.sanRows.length) {
-        if (saved.sanHeaders) {
-          const headRow = document.getElementById('sanChulHeadRow');
-          headRow.innerHTML = saved.sanHeaders.map(h => `<th contenteditable="true">${h}</th>`).join('');
-        }
-        const sanBody = document.getElementById('sanChulBody');
-        sanBody.innerHTML = '';
-        saved.sanRows.forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = row.map(cell => `<td contenteditable="true">${cell}</td>`).join('');
-          sanBody.appendChild(tr);
-        });
+      // 산출 멀티페이지 복원
+      if (saved.sanPageData) {
+        Object.assign(sanPageData, saved.sanPageData);
+        currentSanPage = saved.currentSanPage || 1;
+        restoreSanTabs(sanPageData, currentSanPage);
+        loadSanPageData(sanPageData[currentSanPage]);
+      } else if (saved.sanRows) {
+        // 구버전 단일 산출 호환
+        sanPageData[1] = { headers: saved.sanHeaders || DEFAULT_SAN_HEADERS, rows: saved.sanRows };
+        loadSanPageData(sanPageData[1]);
       }
       return;
     }
@@ -169,11 +175,8 @@ async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
     pageData[currentPage] = getTableRows();
-    const sanHeaders = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
-    const sanRows = [...document.querySelectorAll('#sanChulBody tr')].map(tr =>
-      [...tr.querySelectorAll('td')].map(td => td.textContent)
-    );
-    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, sanHeaders, sanRows, savedAt: Date.now() });
+    sanPageData[currentSanPage] = getSanTableData();
+    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
 
     // 이미지도 IndexedDB에 저장
     document.querySelectorAll('.cell-photo-icon').forEach(async el => {
@@ -388,21 +391,22 @@ async function doSaveToDevice(customName) {
     });
   }
 
-  // ③ 산출 데이터 (입력된 경우만)
-  const sanBody = document.querySelectorAll('#sanChulBody tr');
-  const hasSanData = [...sanBody].some(tr =>
-    [...tr.querySelectorAll('td')].some(td => td.textContent.trim())
-  );
-  const sanBiz = biz;
-  if (hasSanData) {
-    const headers = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
-    const rows = [...sanBody].map(tr => [...tr.querySelectorAll('td')].map(td => td.textContent));
-    const sanLines = [`사업장명:${sanBiz}`, `날짜:${dateStr}`, '', headers.join('\t')];
-    rows.forEach(row => sanLines.push(row.join('\t')));
-    zip.file(`산출-${sanBiz}-${dateStr}.txt`, sanLines.join('\n'));
-  } else {
-    zip.file(`산출-${sanBiz}-${dateStr}.txt`, '데이터 없음');
-  }
+  // ③ 산출 멀티페이지
+  sanPageData[currentSanPage] = getSanTableData();
+  const sanPgNums = Object.keys(sanPageData).map(Number).sort((a, b) => a - b);
+  const sanLines = [`날짜:${dateStr}`, ''];
+  let hasSanData = false;
+  sanPgNums.forEach(pg => {
+    const d = sanPageData[pg];
+    if (!d) return;
+    const hasData = d.rows && d.rows.some(row => row.some(cell => cell.trim()));
+    if (hasData) hasSanData = true;
+    if (sanPgNums.length > 1) sanLines.push(`=== ${pg}페이지 ===`);
+    sanLines.push(d.headers.join('\t'));
+    d.rows.forEach(row => sanLines.push(row.join('\t')));
+    sanLines.push('');
+  });
+  zip.file(`산출-${biz}-${dateStr}.txt`, hasSanData ? sanLines.join('\n') : '데이터 없음');
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
@@ -925,6 +929,106 @@ async function handlePhotoFile(e) {
 document.getElementById('photoInput').addEventListener('change', handlePhotoFile);
 document.getElementById('photoGalleryInput').addEventListener('change', handlePhotoFile);
 
+// ════════════════════════════════════
+// 산출 멀티페이지
+// ════════════════════════════════════
+const DEFAULT_SAN_HEADERS = ['층', '소화기', '주방자동소화장치', '점검결과', '피난기구'];
+let currentSanPage = 1;
+const sanPageData = {}; // { pageNum: { headers:[], rows:[] } }
+
+function getSanTableData() {
+  const headers = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
+  const rows    = [...document.querySelectorAll('#sanChulBody tr')].map(tr =>
+    [...tr.querySelectorAll('td')].map(td => td.textContent)
+  );
+  return { headers, rows };
+}
+
+function loadSanPageData(data) {
+  const headers = data?.headers || DEFAULT_SAN_HEADERS;
+  const rows    = data?.rows    || [[], [], []];
+  const headRow = document.getElementById('sanChulHeadRow');
+  headRow.innerHTML = headers.map(h =>
+    `<th contenteditable="true" inputmode="text" spellcheck="false">${h}</th>`
+  ).join('');
+  const sanBody = document.getElementById('sanChulBody');
+  sanBody.innerHTML = rows.map(row =>
+    `<tr>${row.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`
+  ).join('');
+  if (!sanBody.innerHTML.trim()) {
+    sanBody.innerHTML = Array(3).fill(
+      `<tr>${headers.map(() => `<td contenteditable="true"></td>`).join('')}</tr>`
+    ).join('');
+  }
+}
+
+function switchToSanPage(pageNum) {
+  sanPageData[currentSanPage] = getSanTableData();
+  currentSanPage = pageNum;
+  loadSanPageData(sanPageData[currentSanPage]);
+  scheduleAutoSave();
+}
+
+function bindSanTabClick(tab) {
+  tab.addEventListener('click', () => {
+    const pg = parseInt(tab.dataset.scPage);
+    if (pg === currentSanPage) return;
+    document.querySelectorAll('.sc-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    switchToSanPage(pg);
+  });
+}
+
+document.querySelectorAll('.sc-tab').forEach(bindSanTabClick);
+
+document.getElementById('addSanPageBtn').addEventListener('click', () => {
+  const scroll = document.getElementById('sanTabsScroll');
+  const addBtn = document.getElementById('addSanPageBtn');
+  const count  = document.querySelectorAll('.sc-tab').length + 1;
+  const newTab = document.createElement('button');
+  newTab.className = 'tab sc-tab';
+  newTab.dataset.scPage = count;
+  newTab.textContent = count;
+  bindSanTabClick(newTab);
+  scroll.insertBefore(newTab, addBtn);
+  document.querySelectorAll('.sc-tab').forEach(t => t.classList.remove('active'));
+  newTab.classList.add('active');
+  switchToSanPage(count);
+});
+
+document.getElementById('delSanPageBtn').addEventListener('click', async () => {
+  const allTabs = [...document.querySelectorAll('.sc-tab')];
+  if (allTabs.length <= 1) {
+    showToast('마지막 페이지는 삭제할 수 없습니다.', 'error');
+    return;
+  }
+  const deletedPage = currentSanPage;
+  const activeTab = document.querySelector(`.sc-tab[data-sc-page="${deletedPage}"]`);
+  if (activeTab) activeTab.remove();
+  delete sanPageData[deletedPage];
+
+  const remaining = [...document.querySelectorAll('.sc-tab')]
+    .sort((a, b) => parseInt(a.dataset.scPage) - parseInt(b.dataset.scPage));
+  const newData = {};
+  remaining.forEach((tab, i) => {
+    const oldNum = parseInt(tab.dataset.scPage);
+    const newNum = i + 1;
+    if (sanPageData[oldNum]) newData[newNum] = sanPageData[oldNum];
+    tab.dataset.scPage = newNum;
+    tab.textContent = newNum;
+  });
+  Object.keys(sanPageData).forEach(k => delete sanPageData[k]);
+  Object.assign(sanPageData, newData);
+
+  currentSanPage = Math.min(deletedPage, remaining.length);
+  remaining.forEach(tab => {
+    tab.classList.toggle('active', parseInt(tab.dataset.scPage) === currentSanPage);
+  });
+  loadSanPageData(sanPageData[currentSanPage]);
+  scheduleAutoSave();
+  showToast(`산출 ${deletedPage}페이지 삭제됨`);
+});
+
 // ── Service Worker 등록 ──
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -956,24 +1060,27 @@ let lastFocusedSanCell = null;
 
 function setMode(sanChul) {
   isSanChulMode = sanChul;
-  const memoArea   = document.querySelector('.memo-area');
-  const sanArea    = document.getElementById('sanChulArea');
-  const sanToolbar = document.getElementById('sanChulToolbar');
-  const pageTabsRow = document.getElementById('pageTabsRow');
+  const memoArea      = document.querySelector('.memo-area');
+  const sanArea       = document.getElementById('sanChulArea');
+  const sanToolbar    = document.getElementById('sanChulToolbar');
+  const pageTabsRow   = document.getElementById('pageTabsRow');
+  const sanPageTabsRow = document.getElementById('sanPageTabsRow');
 
   document.getElementById('memoModeBtn').classList.toggle('active', !sanChul);
   document.getElementById('sanChulBtn').classList.toggle('active', sanChul);
 
   if (sanChul) {
-    memoArea.style.display    = 'none';
-    sanArea.style.display     = 'flex';
-    sanToolbar.style.display  = 'flex';
-    pageTabsRow.style.display = 'none';
+    memoArea.style.display       = 'none';
+    sanArea.style.display        = 'flex';
+    sanToolbar.style.display     = 'flex';
+    pageTabsRow.style.display    = 'none';
+    sanPageTabsRow.style.display = 'flex';
   } else {
-    memoArea.style.display    = 'flex';
-    sanArea.style.display     = 'none';
-    sanToolbar.style.display  = 'none';
-    pageTabsRow.style.display = 'flex';
+    memoArea.style.display       = 'flex';
+    sanArea.style.display        = 'none';
+    sanToolbar.style.display     = 'none';
+    pageTabsRow.style.display    = 'flex';
+    sanPageTabsRow.style.display = 'none';
   }
 }
 

@@ -228,17 +228,39 @@ function showToast(msg, type = 'info') {
 document.getElementById('newBtn').addEventListener('click', () => {
   if (!confirm('현재 내용을 지우고 새로 시작할까요?')) return;
   document.getElementById('docName').textContent = '문서 제목';
-  // 페이지 데이터 초기화
+
+  // 메모 페이지 초기화 (1,2만 남기기)
   Object.keys(pageData).forEach(k => delete pageData[k]);
   currentPage = 1;
-  // 탭을 1, 2만 남기기
-  document.querySelectorAll('.tab:not(.add-tab)').forEach(tab => {
+  document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)').forEach(tab => {
     if (parseInt(tab.dataset.page) > 2) tab.remove();
   });
-  document.querySelectorAll('.tab').forEach(t => {
+  document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)').forEach(t => {
     t.classList.toggle('active', parseInt(t.dataset.page) === 1);
   });
   loadPageRows([]);
+
+  // 산출 페이지 초기화 (1,2만 남기기)
+  Object.keys(sanPageData).forEach(k => delete sanPageData[k]);
+  currentSanPage = 1;
+  document.querySelectorAll('#sanTabsScroll .sc-tab').forEach(tab => {
+    if (parseInt(tab.dataset.scPage) > 2) tab.remove();
+  });
+  // 산출탭 2번이 없으면 생성
+  if (!document.querySelector('#sanTabsScroll .sc-tab[data-sc-page="2"]')) {
+    const addBtn = document.getElementById('addSanPageBtn');
+    const tab2 = document.createElement('button');
+    tab2.className = 'tab sc-tab';
+    tab2.dataset.scPage = 2;
+    tab2.textContent = 2;
+    bindSanTabClick(tab2);
+    document.getElementById('sanTabsScroll').insertBefore(tab2, addBtn);
+  }
+  document.querySelectorAll('#sanTabsScroll .sc-tab').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.scPage) === 1);
+  });
+  loadSanPageData(null);
+
   localStorage.removeItem(STORAGE_KEY);
   showToast('✅ 새 문서가 시작됐습니다.');
 });

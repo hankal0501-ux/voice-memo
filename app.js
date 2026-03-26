@@ -5,16 +5,25 @@ const STORAGE_KEY = 'voiceMemo_data';
 
 function saveToStorage() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
+  const bizName = document.getElementById('bizName').value.trim();
   const rows = [];
   document.querySelectorAll('#tableBody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')].map(td => {
-      const img = td.querySelector('img.cell-photo');
+      const img = td.querySelector('.cell-photo-icon');
       if (img) return '__IMG__' + img.dataset.imgId;
       return td.textContent;
     });
     rows.push(cells);
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ title, rows }));
+
+  // 산출 데이터도 함께 저장
+  const sanHeaders = [...document.querySelectorAll('#sanChulHeadRow th')].map(th => th.textContent);
+  const sanRows = [...document.querySelectorAll('#sanChulBody tr')].map(tr =>
+    [...tr.querySelectorAll('td')].map(td => td.textContent)
+  );
+
+  const data = { title, bizName, rows, sanHeaders, sanRows };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function loadFromStorage() {
@@ -23,13 +32,16 @@ function loadFromStorage() {
   try {
     const data = JSON.parse(raw);
     if (data.title) document.getElementById('docName').textContent = data.title;
+    if (data.bizName) document.getElementById('bizName').value = data.bizName;
+
+    // 메인 테이블 복원
     if (data.rows && data.rows.length) {
       const tbody = document.getElementById('tableBody');
       tbody.innerHTML = '';
       data.rows.forEach(row => {
         const tr = document.createElement('tr');
         tr.innerHTML = row.map(cell => {
-          if (cell.startsWith('__IMG__')) {
+          if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
             const id = cell.replace('__IMG__', '');
             const src = localStorage.getItem('img_' + id) || '';
             return `<td contenteditable="false" style="text-align:center">${makeCellImg(id, src)}</td>`;
@@ -39,6 +51,21 @@ function loadFromStorage() {
         tbody.appendChild(tr);
       });
       bindImgClick();
+    }
+
+    // 산출 테이블 복원
+    if (data.sanRows && data.sanRows.length) {
+      if (data.sanHeaders) {
+        const headRow = document.getElementById('sanChulHeadRow');
+        headRow.innerHTML = data.sanHeaders.map(h => `<th contenteditable="true">${h}</th>`).join('');
+      }
+      const sanBody = document.getElementById('sanChulBody');
+      sanBody.innerHTML = '';
+      data.sanRows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = row.map(cell => `<td contenteditable="true">${cell}</td>`).join('');
+        sanBody.appendChild(tr);
+      });
     }
   } catch {}
 }
@@ -815,8 +842,13 @@ document.getElementById('sanChulBtn').addEventListener('click', () => {
 
 // 산출 셀 포커스 기억
 document.getElementById('sanChulArea').addEventListener('focusin', (e) => {
-  if (e.target.tagName === 'TD') lastFocusedSanCell = e.target;
+  if (e.target.tagName === 'TD') {
+    document.querySelectorAll('.sanchul-table td.selected').forEach(td => td.classList.remove('selected'));
+    e.target.classList.add('selected');
+    lastFocusedSanCell = e.target;
+  }
 });
+document.getElementById('sanChulArea').addEventListener('input', scheduleAutoSave);
 
 // + 셀 숫자 증가
 document.getElementById('scPlus').addEventListener('click', () => {

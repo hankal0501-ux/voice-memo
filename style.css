@@ -335,6 +335,10 @@ body {
   -webkit-user-select: text;
   user-select: text;
 }
+.sanchul-table td.selected {
+  background: #fff9c4;
+  border: 2px solid #ffcc00;
+}
 
 /* ── 메모 영역 ── */
 .memo-area {

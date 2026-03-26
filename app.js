@@ -61,7 +61,7 @@ function restoreTabs(savedPageData, savedCurrentPage) {
     tabs.insertBefore(newTab, addBtn);
   });
   // 활성 탭 표시
-  document.querySelectorAll('.tab').forEach(t => {
+  document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)').forEach(t => {
     t.classList.toggle('active', parseInt(t.dataset.page) === savedCurrentPage);
   });
 }
@@ -620,22 +620,18 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
 
 // ── 페이지 삭제 ──
 document.getElementById('delPageBtn').addEventListener('click', async () => {
-  const allTabs = [...document.querySelectorAll('.tab:not(.add-tab)')];
+  const allTabs = memoTabs();
   if (allTabs.length <= 1) {
     showToast('마지막 페이지는 삭제할 수 없습니다.', 'error');
     return;
   }
 
   const deletedPage = currentPage;
-
-  // 현재 탭 제거
-  const activeTab = document.querySelector(`.tab[data-page="${deletedPage}"]`);
+  const activeTab = document.querySelector(`#memoTabsScroll .tab[data-page="${deletedPage}"]`);
   if (activeTab) activeTab.remove();
   delete pageData[deletedPage];
 
-  // 남은 탭 번호 재정렬
-  const remaining = [...document.querySelectorAll('.tab:not(.add-tab)')]
-    .sort((a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page));
+  const remaining = memoTabs().sort((a, b) => parseInt(a.dataset.page) - parseInt(b.dataset.page));
   const newPageData = {};
   remaining.forEach((tab, i) => {
     const oldNum = parseInt(tab.dataset.page);
@@ -647,7 +643,6 @@ document.getElementById('delPageBtn').addEventListener('click', async () => {
   Object.keys(pageData).forEach(k => delete pageData[k]);
   Object.assign(pageData, newPageData);
 
-  // 이전 페이지로 이동
   currentPage = Math.min(deletedPage, remaining.length);
   remaining.forEach(tab => {
     tab.classList.toggle('active', parseInt(tab.dataset.page) === currentPage);
@@ -719,29 +714,33 @@ function switchToPage(pageNum) {
   scheduleAutoSave();
 }
 
+function memoTabs() {
+  return [...document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)')];
+}
+
 function bindTabClick(tab) {
   tab.addEventListener('click', () => {
     const pg = parseInt(tab.dataset.page);
     if (pg === currentPage) return;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    memoTabs().forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     switchToPage(pg);
   });
 }
 
-document.querySelectorAll('.tab:not(.add-tab)').forEach(bindTabClick);
+document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)').forEach(bindTabClick);
 
 document.getElementById('addPageBtn').addEventListener('click', () => {
-  const tabs = document.querySelector('.tabs-scroll');
+  const scroll = document.getElementById('memoTabsScroll');
   const addBtn = document.getElementById('addPageBtn');
-  const count = document.querySelectorAll('.tab:not(.add-tab)').length + 1;
+  const count = memoTabs().length + 1;
   const newTab = document.createElement('button');
   newTab.className = 'tab';
   newTab.dataset.page = count;
   newTab.textContent = count;
   bindTabClick(newTab);
-  tabs.insertBefore(newTab, addBtn);
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  scroll.insertBefore(newTab, addBtn);
+  memoTabs().forEach(t => t.classList.remove('active'));
   newTab.classList.add('active');
   switchToPage(count);
 });
@@ -946,19 +945,19 @@ function getSanTableData() {
 
 function loadSanPageData(data) {
   const headers = data?.headers || DEFAULT_SAN_HEADERS;
-  const rows    = data?.rows    || [[], [], []];
+  const rows    = data?.rows;
   const headRow = document.getElementById('sanChulHeadRow');
   headRow.innerHTML = headers.map(h =>
     `<th contenteditable="true" inputmode="text" spellcheck="false">${h}</th>`
   ).join('');
   const sanBody = document.getElementById('sanChulBody');
-  sanBody.innerHTML = rows.map(row =>
-    `<tr>${row.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`
-  ).join('');
-  if (!sanBody.innerHTML.trim()) {
-    sanBody.innerHTML = Array(3).fill(
-      `<tr>${headers.map(() => `<td contenteditable="true"></td>`).join('')}</tr>`
+  const emptyRow = () => `<tr>${headers.map(() => `<td contenteditable="true"></td>`).join('')}</tr>`;
+  if (rows && rows.length > 0 && rows[0].length > 0) {
+    sanBody.innerHTML = rows.map(row =>
+      `<tr>${row.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`
     ).join('');
+  } else {
+    sanBody.innerHTML = Array(3).fill(null).map(emptyRow).join('');
   }
 }
 

@@ -1068,18 +1068,21 @@ function setMode(sanChul) {
   document.getElementById('memoModeBtn').classList.toggle('active', !sanChul);
   document.getElementById('sanChulBtn').classList.toggle('active', sanChul);
 
+  const scBtns = document.querySelectorAll('.sc-num-btn');
   if (sanChul) {
     memoArea.style.display       = 'none';
     sanArea.style.display        = 'flex';
     sanToolbar.style.display     = 'flex';
     pageTabsRow.style.display    = 'none';
     sanPageTabsRow.style.display = 'flex';
+    scBtns.forEach(b => b.style.display = 'flex');
   } else {
     memoArea.style.display       = 'flex';
     sanArea.style.display        = 'none';
     sanToolbar.style.display     = 'none';
     pageTabsRow.style.display    = 'flex';
     sanPageTabsRow.style.display = 'none';
+    scBtns.forEach(b => b.style.display = 'none');
   }
 }
 

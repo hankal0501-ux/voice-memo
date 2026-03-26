@@ -54,8 +54,6 @@
 
     <!-- 산출 툴바 (산출 모드에서만 표시) -->
     <div class="sanchul-toolbar" id="sanChulToolbar" style="display:none">
-      <button class="sanchul-row-btn add" id="scPlus">＋</button>
-      <button class="sanchul-row-btn del" id="scMinus">－</button>
       <div style="flex:1"></div>
       <button class="sanchul-col-btn" id="scAddRow">행추가</button>
       <button class="sanchul-col-btn" id="scAddCol">열추가</button>
@@ -136,11 +134,9 @@
 
     <!-- 하단 툴바 -->
     <div class="bottom-toolbar">
-      <button class="tool-btn" id="undoBtn" title="실행취소">↩</button>
-      <button class="tool-btn" id="boldBtn" title="굵게">B</button>
       <button class="tool-btn" id="photoBtn" title="사진 삽입">📷</button>
-      <button class="tool-btn" id="shareBtn" title="공유">↗</button>
-      <button class="tool-btn" id="menuBtn" title="더보기">⋯</button>
+      <button class="tool-btn sc-num-btn" id="scPlus" style="display:none">＋</button>
+      <button class="tool-btn sc-num-btn" id="scMinus" style="display:none">－</button>
     </div>
     <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" />
     <input type="file" id="photoGalleryInput" accept="image/*" style="display:none" />

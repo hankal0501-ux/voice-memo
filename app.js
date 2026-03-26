@@ -1121,8 +1121,14 @@ document.getElementById('scAddRow').addEventListener('click', () => {
   const tbody = document.getElementById('sanChulBody');
   const colCount = document.querySelectorAll('#sanChulHeadRow th').length;
   const tr = document.createElement('tr');
-  for (let i = 0; i < colCount; i++) tr.innerHTML += `<td contenteditable="true"></td>`;
+  for (let i = 0; i < colCount; i++) {
+    const td = document.createElement('td');
+    td.contentEditable = 'true';
+    td.setAttribute('inputmode', 'text');
+    tr.appendChild(td);
+  }
   tbody.appendChild(tr);
+  scheduleAutoSave();
 });
 
 // 열 추가
@@ -1132,10 +1138,13 @@ document.getElementById('scAddCol').addEventListener('click', () => {
   th.contentEditable = 'true';
   th.setAttribute('inputmode', 'text');
   th.spellcheck = false;
+  th.textContent = '열' + (head.children.length + 1);
   head.appendChild(th);
   document.querySelectorAll('#sanChulBody tr').forEach(tr => {
     const td = document.createElement('td');
     td.contentEditable = 'true';
+    td.setAttribute('inputmode', 'text');
     tr.appendChild(td);
   });
+  scheduleAutoSave();
 });

@@ -901,15 +901,21 @@ document.getElementById('sanChulArea').addEventListener('input', scheduleAutoSav
 // + 셀 숫자 증가
 document.getElementById('scPlus').addEventListener('click', () => {
   if (!lastFocusedSanCell) return;
-  const val = parseFloat(lastFocusedSanCell.textContent) || 0;
+  const text = lastFocusedSanCell.textContent.trim();
+  if (text !== '' && isNaN(Number(text))) return;
+  const val = Number(text) || 0;
   lastFocusedSanCell.textContent = val + 1;
+  scheduleAutoSave();
 });
 
 // - 셀 숫자 감소
 document.getElementById('scMinus').addEventListener('click', () => {
   if (!lastFocusedSanCell) return;
-  const val = parseFloat(lastFocusedSanCell.textContent) || 0;
+  const text = lastFocusedSanCell.textContent.trim();
+  if (text !== '' && isNaN(Number(text))) return;
+  const val = Number(text) || 0;
   lastFocusedSanCell.textContent = val - 1;
+  scheduleAutoSave();
 });
 
 // 행 추가

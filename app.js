@@ -357,13 +357,12 @@ document.getElementById('saveModal').addEventListener('click', (e) => {
 });
 
 // ── 기기에 저장 (ZIP: 문서 + 사진폴더) ──
-document.getElementById('saveDeviceBtn').addEventListener('click', async () => {
-  document.getElementById('saveModal').classList.remove('open');
+async function doSaveToDevice(customName) {
   showToast('📦 저장 파일 만드는 중...');
 
-  const biz = document.getElementById('docName').textContent.trim() || '문서';
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  const biz = customName || document.getElementById('docName').textContent.trim() || '문서';
   const zipName = `${biz}-${dateStr}`;
 
   const zip = new JSZip();
@@ -416,6 +415,28 @@ document.getElementById('saveDeviceBtn').addEventListener('click', async () => {
   URL.revokeObjectURL(url);
 
   showToast(`✅ ${zipName}.zip 저장 완료`);
+}
+
+document.getElementById('saveDeviceBtn').addEventListener('click', () => {
+  document.getElementById('saveModal').classList.remove('open');
+  const defaultName = document.getElementById('docName').textContent.trim() || '문서';
+  document.getElementById('filenameInput').value = defaultName;
+  document.getElementById('filenameModal').classList.add('open');
+  setTimeout(() => document.getElementById('filenameInput').focus(), 100);
+});
+
+document.getElementById('filenameConfirmBtn').addEventListener('click', () => {
+  const name = document.getElementById('filenameInput').value.trim() || document.getElementById('docName').textContent.trim() || '문서';
+  document.getElementById('filenameModal').classList.remove('open');
+  doSaveToDevice(name);
+});
+
+document.getElementById('filenameModalClose').addEventListener('click', () => {
+  document.getElementById('filenameModal').classList.remove('open');
+});
+
+document.getElementById('filenameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('filenameConfirmBtn').click();
 });
 
 // ── 카카오톡 공유 ──

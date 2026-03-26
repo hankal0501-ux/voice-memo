@@ -461,14 +461,14 @@ body {
   width: 40px;
   height: 40px;
   border: none;
-  background: #ff3b30;
+  background: #8e8e93;
   border-radius: 50%;
   font-size: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(255,59,48,0.4);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
   transition: all 0.15s;
   flex-shrink: 0;
 }

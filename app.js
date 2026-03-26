@@ -774,10 +774,14 @@ const recordBtn = document.getElementById('recordBtn');
 let isRecording = false;
 let recognition = null;
 let lastFocusedCell = null;
+let lastFocusedTarget = null; // 셀 또는 제목
 
 document.addEventListener('focusin', (e) => {
   if (e.target.closest('td[contenteditable]')) {
     lastFocusedCell = e.target.closest('td[contenteditable]');
+    lastFocusedTarget = lastFocusedCell;
+  } else if (e.target.id === 'docName') {
+    lastFocusedTarget = e.target;
   }
 });
 
@@ -804,16 +808,17 @@ function initRecognition() {
 }
 
 function insertTextToCell(text) {
-  const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
-  if (!cell) return;
-  const current = cell.textContent;
-  cell.textContent = current ? current + ' ' + text : text;
+  const target = lastFocusedTarget || lastFocusedCell || document.querySelector('td[contenteditable]');
+  if (!target) return;
+  const current = target.textContent;
+  target.textContent = current ? current + ' ' + text : text;
   const range = document.createRange();
   const sel = window.getSelection();
-  range.selectNodeContents(cell);
+  range.selectNodeContents(target);
   range.collapse(false);
   sel.removeAllRanges();
   sel.addRange(range);
+  if (target.id === 'docName') scheduleAutoSave();
 }
 
 recordBtn.addEventListener('click', toggleRecording);

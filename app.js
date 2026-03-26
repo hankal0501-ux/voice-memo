@@ -871,10 +871,21 @@ function compressImage(file, maxPx, quality) {
 }
 
 document.getElementById('photoBtn').addEventListener('click', () => {
+  document.getElementById('photoModal').classList.add('open');
+});
+document.getElementById('photoCameraBtn').addEventListener('click', () => {
+  document.getElementById('photoModal').classList.remove('open');
   document.getElementById('photoInput').click();
 });
+document.getElementById('photoGalleryBtn').addEventListener('click', () => {
+  document.getElementById('photoModal').classList.remove('open');
+  document.getElementById('photoGalleryInput').click();
+});
+document.getElementById('photoModalClose').addEventListener('click', () => {
+  document.getElementById('photoModal').classList.remove('open');
+});
 
-document.getElementById('photoInput').addEventListener('change', async (e) => {
+async function handlePhotoFile(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -910,7 +921,9 @@ document.getElementById('photoInput').addEventListener('change', async (e) => {
   scheduleAutoSave();
   showToast('✅ 사진 삽입 완료');
   e.target.value = '';
-});
+}
+document.getElementById('photoInput').addEventListener('change', handlePhotoFile);
+document.getElementById('photoGalleryInput').addEventListener('change', handlePhotoFile);
 
 // ── Service Worker 등록 ──
 if ('serviceWorker' in navigator) {

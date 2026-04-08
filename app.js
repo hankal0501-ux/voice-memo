@@ -205,6 +205,13 @@ function scheduleAutoSave() {
 document.getElementById('tableBody').addEventListener('input', scheduleAutoSave);
 document.getElementById('docName').addEventListener('input', scheduleAutoSave);
 
+// 1초마다 자동저장 + 앱 전환시 즉시 저장
+setInterval(() => { saveToStorage(); autoSaveToDevice(); }, 1000);
+window.addEventListener('pagehide', () => { saveToStorage(); autoSaveToDevice(); });
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { saveToStorage(); autoSaveToDevice(); }
+});
+
 // ════════════════════════════════════
 // 토스트 알림 (alert 대체)
 // ════════════════════════════════════

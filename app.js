@@ -839,12 +839,14 @@ function insertTextToCell(text) {
 }
 
 function syncMicBtns() {
-  [recordBtn, recordBtn2].forEach(b => {
-    if (!b) return;
+  document.querySelectorAll('.record-btn').forEach(b => {
     b.classList.toggle('recording', isRecording);
     b.textContent = isRecording ? '⏹' : '🎤';
   });
 }
+
+// 200ms마다 강제 동기화
+setInterval(syncMicBtns, 200);
 
 recordBtn.addEventListener('click', toggleRecording);
 

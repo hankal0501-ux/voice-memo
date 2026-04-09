@@ -403,11 +403,20 @@ async function doSaveToDevice(customName) {
   const { title, text } = buildTxtContent();
   zip.file(`${biz}.txt`, text);
 
-  // ② 사진 폴더
+  // ② 사진 폴더 - 모든 페이지에서 수집
   const photoIds = [];
-  document.querySelectorAll('.cell-photo-icon').forEach(el => {
-    const id = el.dataset.imgId;
-    if (id && !photoIds.includes(id)) photoIds.push(id);
+  const addPhotoId = id => { if (id && !photoIds.includes(id)) photoIds.push(id); };
+
+  // 현재 페이지 DOM에서 수집
+  document.querySelectorAll('.cell-photo-icon').forEach(el => addPhotoId(el.dataset.imgId));
+
+  // 다른 페이지 pageData에서 수집 (__IMG__id 형식)
+  Object.values(pageData).forEach(rows => {
+    rows.forEach(row => row.forEach(cell => {
+      if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
+        addPhotoId(cell.replace('__IMG__', ''));
+      }
+    }));
   });
   if (photoIds.length > 0) {
     const folder = zip.folder('사진');

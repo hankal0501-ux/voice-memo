@@ -847,9 +847,6 @@ function syncMicBtns() {
 }
 
 recordBtn.addEventListener('click', toggleRecording);
-if (recordBtn2) {
-  recordBtn2.addEventListener('click', toggleRecording);
-}
 
 function toggleRecording() {
   isRecording = !isRecording;

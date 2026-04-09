@@ -787,6 +787,7 @@ document.getElementById('addPageBtn').addEventListener('click', () => {
 // 음성인식
 // ════════════════════════════════════
 const recordBtn = document.getElementById('recordBtn');
+const recordBtn2 = document.getElementById('recordBtn2');
 let isRecording = false;
 let recognition = null;
 let lastFocusedCell = null;
@@ -837,8 +838,20 @@ function insertTextToCell(text) {
   if (target.id === 'docName') scheduleAutoSave();
 }
 
+function syncMicBtns() {
+  [recordBtn, recordBtn2].forEach(b => {
+    if (!b) return;
+    b.classList.toggle('recording', isRecording);
+    b.textContent = isRecording ? '⏹' : '🎤';
+  });
+}
+
 recordBtn.addEventListener('click', toggleRecording);
 recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); toggleRecording(); });
+if (recordBtn2) {
+  recordBtn2.addEventListener('click', toggleRecording);
+  recordBtn2.addEventListener('touchend', (e) => { e.preventDefault(); toggleRecording(); });
+}
 
 function toggleRecording() {
   isRecording = !isRecording;
@@ -846,13 +859,11 @@ function toggleRecording() {
     recognition = initRecognition();
     if (!recognition) { isRecording = false; return; }
     recognition.start();
-    recordBtn.classList.add('recording');
-    recordBtn.textContent = '⏹';
+    syncMicBtns();
     showRecordingIndicator(true);
   } else {
     if (recognition) { recognition.onend = null; recognition.stop(); recognition = null; }
-    recordBtn.classList.remove('recording');
-    recordBtn.textContent = '🎤';
+    syncMicBtns();
     showRecordingIndicator(false);
   }
 }

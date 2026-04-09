@@ -846,19 +846,9 @@ function syncMicBtns() {
   });
 }
 
-let micLock = false;
-function fireMic() {
-  if (micLock) return;
-  micLock = true;
-  setTimeout(() => { micLock = false; }, 500);
-  toggleRecording();
-}
-
-recordBtn.addEventListener('touchend', (e) => { e.preventDefault(); fireMic(); });
-recordBtn.addEventListener('click', fireMic);
+recordBtn.addEventListener('click', toggleRecording);
 if (recordBtn2) {
-  recordBtn2.addEventListener('touchend', (e) => { e.preventDefault(); fireMic(); });
-  recordBtn2.addEventListener('click', fireMic);
+  recordBtn2.addEventListener('click', toggleRecording);
 }
 
 function toggleRecording() {

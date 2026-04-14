@@ -408,6 +408,31 @@ body {
 
 .table-wrapper::-webkit-scrollbar { display: none; }
 
+.dong-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 10px;
+}
+.dong-name-wrap label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c1c1e;
+  white-space: nowrap;
+}
+.dong-name-input {
+  flex: 1;
+  font-size: 14px;
+  padding: 6px 10px;
+  border: 1px solid #d1d1d6;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+}
+.dong-name-input:focus {
+  border-color: #007aff;
+}
+
 .memo-table {
   width: 100%;
   border-collapse: collapse;

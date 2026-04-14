@@ -5,11 +5,12 @@ const STORAGE_KEY = 'voiceMemo_data';
 
 function saveToStorage() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
+  const dongName = document.getElementById('dongName')?.value || '';
   // 현재 페이지 데이터를 pageData에 반영
   pageData[currentPage] = getTableRows();
 
   sanPageData[currentSanPage] = getSanTableData();
-  const data = { title, pageData, currentPage, sanPageData: { ...sanPageData }, currentSanPage };
+  const data = { title, dongName, pageData, currentPage, sanPageData: { ...sanPageData }, currentSanPage };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -19,6 +20,10 @@ function loadFromStorage() {
   try {
     const data = JSON.parse(raw);
     if (data.title) document.getElementById('docName').textContent = data.title;
+    if (data.dongName !== undefined) {
+      const dn = document.getElementById('dongName');
+      if (dn) dn.value = data.dongName;
+    }
 
     // 멀티페이지 복원
     if (data.pageData) {
@@ -90,6 +95,8 @@ async function restoreOnLoad() {
     const saved = await idbGet('data', 'autosave');
     if (saved) {
       document.getElementById('docName').textContent = saved.title || '문서 제목';
+      const dn = document.getElementById('dongName');
+      if (dn && saved.dongName !== undefined) dn.value = saved.dongName;
       // 메모 페이지 복원
       if (saved.pageData) {
         Object.assign(pageData, saved.pageData);
@@ -174,9 +181,10 @@ async function idbGet(store, key) {
 async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
+    const dongName = document.getElementById('dongName')?.value || '';
     pageData[currentPage] = getTableRows();
     sanPageData[currentSanPage] = getSanTableData();
-    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
+    await idbSet('data', 'autosave', { title, dongName, pageData: { ...pageData }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
 
     // 이미지도 IndexedDB에 저장
     document.querySelectorAll('.cell-photo-icon').forEach(async el => {
@@ -204,6 +212,7 @@ function scheduleAutoSave() {
 
 document.getElementById('tableBody').addEventListener('input', scheduleAutoSave);
 document.getElementById('docName').addEventListener('input', scheduleAutoSave);
+document.getElementById('dongName')?.addEventListener('input', scheduleAutoSave);
 
 // 1초마다 자동저장 + 앱 전환시 즉시 저장
 setInterval(() => { saveToStorage(); autoSaveToDevice(); }, 1000);

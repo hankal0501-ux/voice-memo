@@ -422,12 +422,14 @@ body {
 }
 .dong-name-input {
   flex: 1;
-  font-size: 14px;
-  padding: 6px 10px;
-  border: 1px solid #d1d1d6;
-  border-radius: 8px;
+  font-size: 17px;
+  font-weight: 500;
+  padding: 12px 14px;
+  border: 1.5px solid #d1d1d6;
+  border-radius: 10px;
   outline: none;
   background: #fff;
+  min-height: 44px;
 }
 .dong-name-input:focus {
   border-color: #007aff;

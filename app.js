@@ -806,7 +806,7 @@ document.addEventListener('focusin', (e) => {
   if (e.target.closest('td[contenteditable]')) {
     lastFocusedCell = e.target.closest('td[contenteditable]');
     lastFocusedTarget = lastFocusedCell;
-  } else if (e.target.id === 'docName') {
+  } else if (e.target.id === 'docName' || e.target.id === 'dongName') {
     lastFocusedTarget = e.target;
   }
 });
@@ -836,6 +836,15 @@ function initRecognition() {
 function insertTextToCell(text) {
   const target = lastFocusedTarget || lastFocusedCell || document.querySelector('td[contenteditable]');
   if (!target) return;
+
+  // input 요소인 경우 (dongName)
+  if (target.tagName === 'INPUT') {
+    target.value = target.value ? target.value + ' ' + text : text;
+    scheduleAutoSave();
+    return;
+  }
+
+  // contenteditable (cell 또는 docName)
   const current = target.textContent;
   target.textContent = current ? current + ' ' + text : text;
   const range = document.createRange();

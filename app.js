@@ -5,12 +5,13 @@ const STORAGE_KEY = 'voiceMemo_data';
 
 function saveToStorage() {
   const title = document.getElementById('docName').textContent.trim() || '문서 제목';
-  const dongName = document.getElementById('dongName')?.value || '';
-  // 현재 페이지 데이터를 pageData에 반영
+  // 현재 페이지 데이터 + 동이름 반영
   pageData[currentPage] = getTableRows();
+  const dn = document.getElementById('dongName');
+  if (dn) pageDongNames[currentPage] = dn.value;
 
   sanPageData[currentSanPage] = getSanTableData();
-  const data = { title, dongName, pageData, currentPage, sanPageData: { ...sanPageData }, currentSanPage };
+  const data = { title, pageData, pageDongNames: { ...pageDongNames }, currentPage, sanPageData: { ...sanPageData }, currentSanPage };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -20,10 +21,7 @@ function loadFromStorage() {
   try {
     const data = JSON.parse(raw);
     if (data.title) document.getElementById('docName').textContent = data.title;
-    if (data.dongName !== undefined) {
-      const dn = document.getElementById('dongName');
-      if (dn) dn.value = data.dongName;
-    }
+    if (data.pageDongNames) Object.assign(pageDongNames, data.pageDongNames);
 
     // 멀티페이지 복원
     if (data.pageData) {
@@ -31,6 +29,8 @@ function loadFromStorage() {
       currentPage = data.currentPage || 1;
       restoreTabs(pageData, currentPage);
       loadPageRows(pageData[currentPage] || []);
+      const dn = document.getElementById('dongName');
+      if (dn) dn.value = pageDongNames[currentPage] || '';
     } else if (data.rows && data.rows.length) {
       // 구버전 단일페이지 호환
       pageData[1] = data.rows;
@@ -95,14 +95,15 @@ async function restoreOnLoad() {
     const saved = await idbGet('data', 'autosave');
     if (saved) {
       document.getElementById('docName').textContent = saved.title || '문서 제목';
-      const dn = document.getElementById('dongName');
-      if (dn && saved.dongName !== undefined) dn.value = saved.dongName;
+      if (saved.pageDongNames) Object.assign(pageDongNames, saved.pageDongNames);
       // 메모 페이지 복원
       if (saved.pageData) {
         Object.assign(pageData, saved.pageData);
         currentPage = saved.currentPage || 1;
         restoreTabs(pageData, currentPage);
         await loadPageRows(pageData[currentPage] || []);
+        const dn = document.getElementById('dongName');
+        if (dn) dn.value = pageDongNames[currentPage] || '';
       } else if (saved.rows && saved.rows.length) {
         pageData[1] = saved.rows;
         currentPage = 1;
@@ -181,10 +182,11 @@ async function idbGet(store, key) {
 async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
-    const dongName = document.getElementById('dongName')?.value || '';
     pageData[currentPage] = getTableRows();
+    const dn = document.getElementById('dongName');
+    if (dn) pageDongNames[currentPage] = dn.value;
     sanPageData[currentSanPage] = getSanTableData();
-    await idbSet('data', 'autosave', { title, dongName, pageData: { ...pageData }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
+    await idbSet('data', 'autosave', { title, pageData: { ...pageData }, pageDongNames: { ...pageDongNames }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
 
     // 이미지도 IndexedDB에 저장
     document.querySelectorAll('.cell-photo-icon').forEach(async el => {
@@ -704,6 +706,7 @@ document.getElementById('delPageBtn').addEventListener('click', async () => {
 // ════════════════════════════════════
 let currentPage = 1;
 const pageData = {}; // { pageNum: rows[] }
+const pageDongNames = {}; // { pageNum: "동이름" }
 
 function getTableRows() {
   const rows = [];
@@ -753,11 +756,14 @@ async function loadPageRows(rows) {
 }
 
 function switchToPage(pageNum) {
-  // 현재 페이지 데이터 저장
+  // 현재 페이지 데이터 + 동이름 저장
   pageData[currentPage] = getTableRows();
+  const dn = document.getElementById('dongName');
+  if (dn) pageDongNames[currentPage] = dn.value;
   currentPage = pageNum;
-  // 새 페이지 데이터 로드
+  // 새 페이지 데이터 + 동이름 로드
   loadPageRows(pageData[currentPage] || []);
+  if (dn) dn.value = pageDongNames[currentPage] || '';
   scheduleAutoSave();
 }
 

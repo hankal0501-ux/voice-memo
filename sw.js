@@ -1,4 +1,4 @@
-const CACHE = 'voice-memo-v83';
+const CACHE = 'voice-memo-v84';
 const FILES = ['/', '/index.html', '/style.css', '/app.js'];
 
 self.addEventListener('install', e => {

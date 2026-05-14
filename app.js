@@ -179,6 +179,16 @@ async function idbGet(store, key) {
   });
 }
 
+async function idbClear(store) {
+  const d = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(store, 'readwrite');
+    tx.objectStore(store).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = reject;
+  });
+}
+
 async function autoSaveToDevice() {
   try {
     const title = document.getElementById('docName').textContent.trim() || '자동저장중';
@@ -279,8 +289,25 @@ document.getElementById('newBtn').addEventListener('click', () => {
   });
   loadSanPageData(null);
 
+  // 모든 사진 데이터 + 카운터 + 동이름 초기화
+  Object.keys(pageDongNames).forEach(k => delete pageDongNames[k]);
+  const dnEl = document.getElementById('dongName');
+  if (dnEl) dnEl.value = '';
+
+  // localStorage의 모든 사진 데이터 삭제
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('img_') || k === 'imgCounter')) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // IndexedDB 자동저장 + 이미지 모두 삭제
+  idbClear('data').catch(() => {});
+  idbClear('images').catch(() => {});
+
   localStorage.removeItem(STORAGE_KEY);
-  showToast('✅ 새 문서가 시작됐습니다.');
+  showToast('✅ 새 문서가 시작됐습니다. (메모리 정리 완료)');
 });
 
 // ── 불러오기 ──
@@ -977,20 +1004,19 @@ async function handlePhotoFile(e) {
   showToast('📷 사진 처리 중...');
   const compressed = await compressImage(file, 600, 0.7);
 
-  // localStorage 여유 공간 체크 (~5MB 한도)
-  const usedKB = Math.round(JSON.stringify(localStorage).length / 1024);
-  if (usedKB > 4500) {
-    showToast('❌ 저장 공간 부족. 기기 저장 후 일부 사진을 삭제해주세요.', 'error');
-    e.target.value = '';
-    return;
-  }
-
   const id = Date.now().toString();
   const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
   localStorage.setItem('imgCounter', imgCounter);
   const imgName = String(imgCounter);
-  localStorage.setItem('img_' + id, compressed);
-  localStorage.setItem('img_name_' + id, imgName);
+
+  // 이미지는 IndexedDB에 저장 (localStorage 5MB 한도 회피)
+  try {
+    await idbSet('images', id, { src: compressed, name: imgName });
+  } catch (err) {
+    showToast('❌ 저장 공간 부족: ' + err.message, 'error');
+    e.target.value = '';
+    return;
+  }
 
   const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
   if (!cell) { showToast('❌ 먼저 셀을 선택해주세요.', 'error'); return; }
@@ -999,7 +1025,7 @@ async function handlePhotoFile(e) {
   cell.innerHTML = makeCellImg(id, compressed, imgName);
   bindImgClick();
   scheduleAutoSave();
-  showToast('✅ 사진 삽입 완료');
+  showToast(`✅ 사진 ${imgName} 삽입 완료`);
   e.target.value = '';
 }
 document.getElementById('photoInput').addEventListener('change', handlePhotoFile);

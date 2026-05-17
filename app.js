@@ -292,8 +292,7 @@ function showToast(msg, type = 'info') {
 // 불러오기
 // ════════════════════════════════════
 // ── 새로 시작 ──
-document.getElementById('newBtn').addEventListener('click', () => {
-  if (!confirm('현재 내용을 지우고 새로 시작할까요?')) return;
+async function resetAllData() {
   document.getElementById('docName').textContent = '문서 제목';
 
   // 메모 페이지 초기화 (1,2만 남기기)
@@ -305,7 +304,7 @@ document.getElementById('newBtn').addEventListener('click', () => {
   document.querySelectorAll('#memoTabsScroll .tab:not(.add-tab)').forEach(t => {
     t.classList.toggle('active', parseInt(t.dataset.page) === 1);
   });
-  loadPageRows([]);
+  await loadPageRows([]);
 
   // 산출 페이지 초기화 (1,2만 남기기)
   Object.keys(sanPageData).forEach(k => delete sanPageData[k]);
@@ -313,7 +312,6 @@ document.getElementById('newBtn').addEventListener('click', () => {
   document.querySelectorAll('#sanTabsScroll .sc-tab').forEach(tab => {
     if (parseInt(tab.dataset.scPage) > 2) tab.remove();
   });
-  // 산출탭 2번이 없으면 생성
   if (!document.querySelector('#sanTabsScroll .sc-tab[data-sc-page="2"]')) {
     const addBtn = document.getElementById('addSanPageBtn');
     const tab2 = document.createElement('button');
@@ -328,12 +326,10 @@ document.getElementById('newBtn').addEventListener('click', () => {
   });
   loadSanPageData(null);
 
-  // 모든 사진 데이터 + 카운터 + 동이름 초기화
   Object.keys(pageDongNames).forEach(k => delete pageDongNames[k]);
   const dnEl = document.getElementById('dongName');
   if (dnEl) dnEl.value = '';
 
-  // localStorage의 모든 사진 데이터 삭제
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -341,11 +337,27 @@ document.getElementById('newBtn').addEventListener('click', () => {
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
-  // IndexedDB 자동저장 + 이미지 모두 삭제
   idbClear('data').catch(() => {});
   idbClear('images').catch(() => {});
 
   localStorage.removeItem(STORAGE_KEY);
+}
+
+async function autoBackupAndReset() {
+  showToast('💾 용량 부족: ZIP 자동 백업 중...');
+  try {
+    await doSaveToDevice();
+  } catch (err) {
+    console.error('자동 백업 실패:', err);
+    showToast('⚠️ ZIP 백업 실패: ' + (err.message || ''), 'error');
+  }
+  await resetAllData();
+  showToast('✅ 백업 완료, 새 문서 시작');
+}
+
+document.getElementById('newBtn').addEventListener('click', async () => {
+  if (!confirm('현재 내용을 지우고 새로 시작할까요?')) return;
+  await resetAllData();
   showToast('✅ 새 문서가 시작됐습니다. (메모리 정리 완료)');
 });
 
@@ -508,13 +520,28 @@ async function doSaveToDevice(customName) {
   });
   if (photoIds.length > 0) {
     const folder = zip.folder('사진');
-    photoIds.forEach((id, idx) => {
-      const src = localStorage.getItem('img_' + id) || '';
-      if (!src) return;
+    let missingCount = 0;
+    for (let idx = 0; idx < photoIds.length; idx++) {
+      const id = photoIds[idx];
+      let src = localStorage.getItem('img_' + id) || '';
+      let name = localStorage.getItem('img_name_' + id) || '';
+      // localStorage에 없으면 IndexedDB fallback (마이그레이션 실패 대비)
+      if (!src) {
+        try {
+          const imgData = await idbGet('images', id);
+          if (imgData && imgData.src) {
+            src = imgData.src;
+            if (!name && imgData.name) name = imgData.name;
+          }
+        } catch {}
+      }
+      if (!src) { missingCount++; continue; }
       const base64 = src.replace(/^data:image\/\w+;base64,/, '');
-      const name = localStorage.getItem('img_name_' + id) || `photo_${idx + 1}`;
-      folder.file(`${name}_${id}.jpg`, base64, { base64: true });
-    });
+      folder.file(`${name || ('photo_' + (idx + 1))}_${id}.jpg`, base64, { base64: true });
+    }
+    if (missingCount > 0) {
+      showToast(`⚠️ 사진 ${missingCount}장을 찾을 수 없습니다`, 'error');
+    }
   }
 
   // ③ 산출 멀티페이지
@@ -818,9 +845,19 @@ async function loadPageRows(rows) {
     for (const cell of row) {
       if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
         const id = cell.replace('__IMG__', '');
-        const src = localStorage.getItem('img_' + id) || '';
-        const name = localStorage.getItem('img_name_' + id) || '사진';
-        cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name)}</td>`);
+        let src = localStorage.getItem('img_' + id) || '';
+        let name = localStorage.getItem('img_name_' + id) || '';
+        // localStorage에 없으면 IndexedDB fallback (마이그레이션 실패 대비)
+        if (!src) {
+          try {
+            const imgData = await idbGet('images', id);
+            if (imgData && imgData.src) {
+              src = imgData.src;
+              if (!name && imgData.name) name = imgData.name;
+            }
+          } catch {}
+        }
+        cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name || '사진')}</td>`);
       } else {
         cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
       }
@@ -1059,14 +1096,25 @@ async function handlePhotoFile(e) {
   const imgName = String(imgCounter);
 
   // 이미지를 localStorage에 저장 (ZIP 내보내기/다른 PC 호환)
+  let saved = false;
   try {
     localStorage.setItem('img_' + id, compressed);
     localStorage.setItem('img_name_' + id, imgName);
+    saved = true;
   } catch (err) {
-    showToast('❌ 저장 공간 부족 (사진이 너무 많거나 큽니다)', 'error');
-    e.target.value = '';
-    return;
+    // 용량 부족 → ZIP 자동 백업 후 새로 시작
+    await autoBackupAndReset();
+    try {
+      localStorage.setItem('img_' + id, compressed);
+      localStorage.setItem('img_name_' + id, imgName);
+      saved = true;
+    } catch (err2) {
+      showToast('❌ 저장 실패: ' + (err2.message || ''), 'error');
+      e.target.value = '';
+      return;
+    }
   }
+  if (!saved) { e.target.value = ''; return; }
 
   const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
   if (!cell) { showToast('❌ 먼저 셀을 선택해주세요.', 'error'); return; }

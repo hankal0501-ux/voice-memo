@@ -125,7 +125,55 @@ async function restoreOnLoad() {
   } catch {}
   loadFromStorage(); // fallback
 }
-restoreOnLoad();
+
+// 기존 IndexedDB의 이미지를 localStorage로 마이그레이션 (1회성)
+async function migrateImagesToLocalStorage() {
+  if (localStorage.getItem('imgMigratedV1')) return;
+  try {
+    const d = await openDb();
+    const tx = d.transaction('images', 'readonly');
+    const store = tx.objectStore('images');
+    const req = store.openCursor();
+    const migrated = [];
+    await new Promise((resolve) => {
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const id = cursor.key;
+          const val = cursor.value || {};
+          if (val.src && !localStorage.getItem('img_' + id)) {
+            try {
+              localStorage.setItem('img_' + id, val.src);
+              if (val.name) localStorage.setItem('img_name_' + id, val.name);
+              migrated.push(id);
+            } catch (err) {
+              console.warn('localStorage 한도 초과, 마이그레이션 중단:', err);
+              resolve();
+              return;
+            }
+          }
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      req.onerror = () => resolve();
+    });
+    localStorage.setItem('imgMigratedV1', '1');
+    if (migrated.length > 0) {
+      console.log(`✅ 사진 ${migrated.length}장을 localStorage로 마이그레이션 완료`);
+      // 화면 다시 그리기
+      await loadPageRows(pageData[currentPage] || []);
+    }
+  } catch (e) {
+    console.error('마이그레이션 실패:', e);
+  }
+}
+
+(async () => {
+  await restoreOnLoad();
+  await migrateImagesToLocalStorage();
+})();
 
 // ── 자동저장 표시 ──
 function showAutoSaveIndicator() {
@@ -197,15 +245,6 @@ async function autoSaveToDevice() {
     if (dn) pageDongNames[currentPage] = dn.value;
     sanPageData[currentSanPage] = getSanTableData();
     await idbSet('data', 'autosave', { title, pageData: { ...pageData }, pageDongNames: { ...pageDongNames }, currentPage, sanPageData: { ...sanPageData }, currentSanPage, savedAt: Date.now() });
-
-    // 이미지도 IndexedDB에 저장
-    document.querySelectorAll('.cell-photo-icon').forEach(async el => {
-      const id = el.dataset.imgId;
-      if (!id) return;
-      const src = el.dataset.imgSrc || localStorage.getItem('img_' + id);
-      const name = el.dataset.imgName || localStorage.getItem('img_name_' + id);
-      if (src) await idbSet('images', id, { src, name });
-    });
   } catch (e) {
     console.error('IndexedDB 저장 실패:', e);
   }
@@ -326,20 +365,31 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
       showToast('📂 불러오는 중...');
       const zip = await JSZip.loadAsync(file);
 
-      // 사진 먼저 복원
+      // 사진 먼저 복원 (구버전 photos/, 신버전 사진/ 모두 지원)
       const photoMap = {};
+      let storageFull = false;
       for (const [path, zipFile] of Object.entries(zip.files)) {
-        if (path.startsWith('photos/') && !zipFile.dir) {
-          const base64 = await zipFile.async('base64');
-          const src = 'data:image/jpeg;base64,' + base64;
-          // 파일명에서 id 추출 (photo_1_1234567890.jpg)
-          const match = path.match(/_(\d{13})\.jpg$/);
-          if (match) {
-            const id = match[1];
-            localStorage.setItem('img_' + id, src);
-            photoMap[id] = src;
-          }
+        if (zipFile.dir) continue;
+        if (!(path.startsWith('photos/') || path.startsWith('사진/'))) continue;
+        const base64 = await zipFile.async('base64');
+        const src = 'data:image/jpeg;base64,' + base64;
+        // 파일명에서 id 추출 (이름_1234567890.jpg)
+        const fileName = path.split('/').pop();
+        const match = fileName.match(/_(\d{13})\.jpg$/i);
+        if (!match) continue;
+        const id = match[1];
+        const name = fileName.replace(/_(\d{13})\.jpg$/i, '');
+        try {
+          localStorage.setItem('img_' + id, src);
+          if (name) localStorage.setItem('img_name_' + id, name);
+          photoMap[id] = src;
+        } catch (err) {
+          storageFull = true;
+          break;
         }
+      }
+      if (storageFull) {
+        showToast('⚠️ 저장 공간 부족: 일부 사진만 복원됨', 'error');
       }
 
       // txt 파일 찾아 복원
@@ -768,9 +818,8 @@ async function loadPageRows(rows) {
     for (const cell of row) {
       if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
         const id = cell.replace('__IMG__', '');
-        const imgData = await idbGet('images', id).catch(() => null);
-        const src = imgData?.src || localStorage.getItem('img_' + id) || '';
-        const name = imgData?.name || localStorage.getItem('img_name_' + id) || '사진';
+        const src = localStorage.getItem('img_' + id) || '';
+        const name = localStorage.getItem('img_name_' + id) || '사진';
         cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name)}</td>`);
       } else {
         cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
@@ -1009,11 +1058,12 @@ async function handlePhotoFile(e) {
   localStorage.setItem('imgCounter', imgCounter);
   const imgName = String(imgCounter);
 
-  // 이미지는 IndexedDB에 저장 (localStorage 5MB 한도 회피)
+  // 이미지를 localStorage에 저장 (ZIP 내보내기/다른 PC 호환)
   try {
-    await idbSet('images', id, { src: compressed, name: imgName });
+    localStorage.setItem('img_' + id, compressed);
+    localStorage.setItem('img_name_' + id, imgName);
   } catch (err) {
-    showToast('❌ 저장 공간 부족: ' + err.message, 'error');
+    showToast('❌ 저장 공간 부족 (사진이 너무 많거나 큽니다)', 'error');
     e.target.value = '';
     return;
   }

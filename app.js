@@ -162,6 +162,17 @@ async function migrateImagesToLocalStorage() {
     localStorage.setItem('imgMigratedV1', '1');
     if (migrated.length > 0) {
       console.log(`✅ 사진 ${migrated.length}장을 localStorage로 마이그레이션 완료`);
+      // 옮긴 사진은 IDB에서 삭제 (메모리 절약)
+      try {
+        const d2 = await openDb();
+        const tx2 = d2.transaction('images', 'readwrite');
+        const store2 = tx2.objectStore('images');
+        migrated.forEach(id => store2.delete(id));
+        await new Promise((res) => { tx2.oncomplete = res; tx2.onerror = res; });
+        console.log(`🗑️ IndexedDB에서 옮긴 사진 ${migrated.length}장 정리 완료`);
+      } catch (cleanupErr) {
+        console.warn('IDB 정리 실패:', cleanupErr);
+      }
       // 화면 다시 그리기
       await loadPageRows(pageData[currentPage] || []);
     }
@@ -337,8 +348,9 @@ async function resetAllData() {
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
-  idbClear('data').catch(() => {});
-  idbClear('images').catch(() => {});
+  // IndexedDB 확실히 비우기 (메모리 회수 보장)
+  try { await idbClear('data'); } catch {}
+  try { await idbClear('images'); } catch {}
 
   localStorage.removeItem(STORAGE_KEY);
 }

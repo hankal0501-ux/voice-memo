@@ -631,7 +631,7 @@ ${memoBodyNoImg}
 <button class="btn-print" onclick="window.print()">📄 PDF 저장</button>
 </body></html>`;
 
-  zip.file(`${biz}-사진없음-${dateStr}.html`, memoHtmlNoImg);
+  zip.file(`${biz} - 사진없음 - ${dateStr}.html`, memoHtmlNoImg);
 
   // ② 사진 폴더 - 모든 페이지에서 수집
   const photoIds = [];

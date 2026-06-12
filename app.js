@@ -556,47 +556,64 @@ async function doSaveToDevice(customName) {
     }
   }
 
-  // ③ 산출 멀티페이지 - 표 형식 정렬
+  // ③ 산출 멀티페이지 - HTML 표 (가로 스크롤, 한 줄 표시)
   sanPageData[currentSanPage] = getSanTableData();
   const sanPgNums = Object.keys(sanPageData).map(Number).sort((a, b) => a - b);
-  const sanLines = [`날짜:${dateStr}`, ''];
   let hasSanData = false;
+  const escape = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  // 한글 폭 계산 (한글=2, 영문/숫자=1)
-  const charWidth = s => [...String(s||'')].reduce((sum, c) =>
-    sum + (c.charCodeAt(0) > 127 ? 2 : 1), 0);
-  const padCell = (s, width) => {
-    const str = String(s||'');
-    return str + ' '.repeat(Math.max(0, width - charWidth(str)));
-  };
-
+  let sanBodyHtml = '';
   sanPgNums.forEach(pg => {
     const d = sanPageData[pg];
     if (!d) return;
     const hasData = d.rows && d.rows.some(row => row.some(cell => cell.trim()));
     if (hasData) hasSanData = true;
-    if (sanPgNums.length > 1) sanLines.push(`=== ${pg}페이지 ===`);
 
-    // 각 컬럼의 최대 폭 계산
-    const colWidths = d.headers.map((h, i) => {
-      const maxData = d.rows.reduce((max, row) =>
-        Math.max(max, charWidth(row[i] || '')), 0);
-      return Math.max(charWidth(h), maxData) + 2;
-    });
-
-    const sep = '+' + colWidths.map(w => '-'.repeat(w)).join('+') + '+';
-    const headerLine = '|' + d.headers.map((h, i) => ' ' + padCell(h, colWidths[i] - 1)).join('|') + '|';
-
-    sanLines.push(sep);
-    sanLines.push(headerLine);
-    sanLines.push(sep);
+    if (sanPgNums.length > 1) sanBodyHtml += `<h3>${pg}페이지</h3>`;
+    sanBodyHtml += `<table><thead><tr>`;
+    d.headers.forEach(h => { sanBodyHtml += `<th>${escape(h)}</th>`; });
+    sanBodyHtml += `</tr></thead><tbody>`;
     d.rows.forEach(row => {
-      sanLines.push('|' + row.map((c, i) => ' ' + padCell(c, colWidths[i] - 1)).join('|') + '|');
+      sanBodyHtml += `<tr>`;
+      row.forEach(c => { sanBodyHtml += `<td>${escape(c)}</td>`; });
+      sanBodyHtml += `</tr>`;
     });
-    sanLines.push(sep);
-    sanLines.push('');
+    sanBodyHtml += `</tbody></table>`;
   });
-  zip.file(`산출-${biz}-${dateStr}.txt`, hasSanData ? sanLines.join('\n') : '데이터 없음');
+
+  const sanHtml = `<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>산출 - ${escape(biz)}</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  body{font-family:'Malgun Gothic',sans-serif;padding:12px;margin:0;}
+  h2{margin:0 0 8px;font-size:18px;}
+  .info{color:#666;margin-bottom:12px;font-size:13px;}
+  .table-wrap{overflow-x:auto;border:1px solid #d1d1d6;border-radius:8px;}
+  table{border-collapse:collapse;width:100%;}
+  th,td{border:1px solid #888;padding:6px 8px;font-size:12px;text-align:center;white-space:nowrap;}
+  th{background:#3a3a3c;color:#fff;font-weight:600;}
+  tr:nth-child(even) td{background:#f5f5f7;}
+  h3{margin:16px 0 6px;font-size:14px;color:#555;}
+  .btn-print{position:fixed;bottom:16px;right:16px;padding:12px 20px;background:#007aff;color:#fff;border:none;border-radius:24px;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;}
+  @media print {
+    .btn-print{display:none;}
+    .table-wrap{border:none;overflow:visible;}
+    body{padding:0;}
+    table{width:100% !important;}
+    th,td{white-space:normal;font-size:10px;padding:4px 6px;}
+  }
+</style></head><body>
+<h2>산출 - ${escape(biz)}</h2>
+<div class="info">날짜: ${dateStr}</div>
+<div class="table-wrap">
+${hasSanData ? sanBodyHtml : '<p style="padding:12px;color:#999;">데이터 없음</p>'}
+</div>
+<button class="btn-print" onclick="window.print()">📄 PDF 저장 (세로)</button>
+</body></html>`;
+
+  zip.file(`산출-${biz}-${dateStr}.html`, sanHtml);
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);

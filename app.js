@@ -587,6 +587,52 @@ ${memoBodyHtml}
 
   zip.file(`${biz}-${dateStr}.html`, memoHtml);
 
+  // ①-2 사진 없는 버전 HTML (사진 셀은 표시 안 함)
+  let memoBodyNoImg = '';
+  memoPgNums.forEach(pg => {
+    const rows = pageData[pg] || [];
+    if (memoPgNums.length > 1) memoBodyNoImg += `<h3>${pg}페이지${pageDongNames[pg] ? ' - ' + escHtml(pageDongNames[pg]) : ''}</h3>`;
+    else if (pageDongNames[pg]) memoBodyNoImg += `<h3>${escHtml(pageDongNames[pg])}</h3>`;
+    memoBodyNoImg += `<table><thead><tr><th style="width:8%">층</th><th style="width:15%">위치</th><th>점검내용</th><th style="width:15%">점검결과</th></tr></thead><tbody>`;
+    rows.forEach(row => {
+      memoBodyNoImg += `<tr>`;
+      row.forEach(cell => {
+        if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
+          memoBodyNoImg += `<td></td>`;
+        } else {
+          memoBodyNoImg += `<td>${escHtml(cell)}</td>`;
+        }
+      });
+      memoBodyNoImg += `</tr>`;
+    });
+    memoBodyNoImg += `</tbody></table>`;
+  });
+
+  const memoHtmlNoImg = `<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escHtml(biz)} (사진없음)</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  body{font-family:'Malgun Gothic',sans-serif;padding:12px;margin:0;}
+  h2{margin:0 0 8px;font-size:18px;text-align:center;}
+  .info{color:#666;margin-bottom:12px;font-size:13px;text-align:right;}
+  table{border-collapse:collapse;width:100%;margin-bottom:16px;}
+  th,td{border:1px solid #888;padding:6px 8px;font-size:12px;vertical-align:top;}
+  th{background:#3a3a3c;color:#fff;font-weight:600;text-align:center;}
+  td{word-break:break-word;}
+  h3{margin:16px 0 6px;font-size:14px;color:#c0392b;}
+  .btn-print{position:fixed;bottom:16px;right:16px;padding:12px 20px;background:#007aff;color:#fff;border:none;border-radius:24px;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;}
+  @media print { .btn-print{display:none;} body{padding:0;} }
+</style></head><body>
+<h2>${escHtml(biz)}</h2>
+<div class="info">날짜: ${dateStr}</div>
+${memoBodyNoImg}
+<button class="btn-print" onclick="window.print()">📄 PDF 저장</button>
+</body></html>`;
+
+  zip.file(`${biz}(사진없는)-${dateStr}.html`, memoHtmlNoImg);
+
   // ② 사진 폴더 - 모든 페이지에서 수집
   const photoIds = [];
   const addPhotoId = id => { if (id && !photoIds.includes(id)) photoIds.push(id); };

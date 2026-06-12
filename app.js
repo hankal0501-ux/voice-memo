@@ -1207,7 +1207,7 @@ function loadSanPageData(data) {
   ).join('');
   const sanBody = document.getElementById('sanChulBody');
   const emptyRow = () =>
-    `<tr>${Array(colCount).fill('<td contenteditable="true"></td>').join('')}</tr>`;
+    `<tr>${Array(colCount).fill('<td contenteditable="true" inputmode="numeric"></td>').join('')}</tr>`;
 
   const rows = data?.rows;
   const hasData = rows && rows.length > 0 && rows.some(r => r.length > 0);
@@ -1215,7 +1215,7 @@ function loadSanPageData(data) {
     // 모든 행의 셀 수를 헤더에 맞춰 정규화
     sanBody.innerHTML = rows.map(row => {
       const cells = Array(colCount).fill('').map((_, i) => row[i] ?? '');
-      return `<tr>${cells.map(cell => `<td contenteditable="true">${cell}</td>`).join('')}</tr>`;
+      return `<tr>${cells.map(cell => `<td contenteditable="true" inputmode="numeric">${cell}</td>`).join('')}</tr>`;
     }).join('');
   } else {
     sanBody.innerHTML = Array(3).fill(null).map(emptyRow).join('');
@@ -1388,7 +1388,7 @@ document.getElementById('scAddRow').addEventListener('click', () => {
   for (let i = 0; i < colCount; i++) {
     const td = document.createElement('td');
     td.contentEditable = 'true';
-    td.setAttribute('inputmode', 'text');
+    td.setAttribute('inputmode', 'numeric');
     tr.appendChild(td);
   }
   tbody.appendChild(tr);
@@ -1407,7 +1407,7 @@ document.getElementById('scAddCol').addEventListener('click', () => {
   document.querySelectorAll('#sanChulBody tr').forEach(tr => {
     const td = document.createElement('td');
     td.contentEditable = 'true';
-    td.setAttribute('inputmode', 'text');
+    td.setAttribute('inputmode', 'numeric');
     tr.appendChild(td);
   });
   scheduleAutoSave();

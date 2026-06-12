@@ -515,9 +515,6 @@ async function doSaveToDevice(customName) {
   const { title, text } = buildTxtContent();
   zip.file(`${biz}-${dateStr}.txt`, text);
 
-  // 7.변환저장 폴더 (PDF/HWP 변환 결과물 저장용)
-  zip.folder('7.변환저장');
-
   // ② 사진 폴더 - 모든 페이지에서 수집
   const photoIds = [];
   const addPhotoId = id => { if (id && !photoIds.includes(id)) photoIds.push(id); };

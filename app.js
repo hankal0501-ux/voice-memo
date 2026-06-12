@@ -556,19 +556,44 @@ async function doSaveToDevice(customName) {
     }
   }
 
-  // ③ 산출 멀티페이지
+  // ③ 산출 멀티페이지 - 표 형식 정렬
   sanPageData[currentSanPage] = getSanTableData();
   const sanPgNums = Object.keys(sanPageData).map(Number).sort((a, b) => a - b);
   const sanLines = [`날짜:${dateStr}`, ''];
   let hasSanData = false;
+
+  // 한글 폭 계산 (한글=2, 영문/숫자=1)
+  const charWidth = s => [...String(s||'')].reduce((sum, c) =>
+    sum + (c.charCodeAt(0) > 127 ? 2 : 1), 0);
+  const padCell = (s, width) => {
+    const str = String(s||'');
+    return str + ' '.repeat(Math.max(0, width - charWidth(str)));
+  };
+
   sanPgNums.forEach(pg => {
     const d = sanPageData[pg];
     if (!d) return;
     const hasData = d.rows && d.rows.some(row => row.some(cell => cell.trim()));
     if (hasData) hasSanData = true;
     if (sanPgNums.length > 1) sanLines.push(`=== ${pg}페이지 ===`);
-    sanLines.push(d.headers.join('\t'));
-    d.rows.forEach(row => sanLines.push(row.join('\t')));
+
+    // 각 컬럼의 최대 폭 계산
+    const colWidths = d.headers.map((h, i) => {
+      const maxData = d.rows.reduce((max, row) =>
+        Math.max(max, charWidth(row[i] || '')), 0);
+      return Math.max(charWidth(h), maxData) + 2;
+    });
+
+    const sep = '+' + colWidths.map(w => '-'.repeat(w)).join('+') + '+';
+    const headerLine = '|' + d.headers.map((h, i) => ' ' + padCell(h, colWidths[i] - 1)).join('|') + '|';
+
+    sanLines.push(sep);
+    sanLines.push(headerLine);
+    sanLines.push(sep);
+    d.rows.forEach(row => {
+      sanLines.push('|' + row.map((c, i) => ' ' + padCell(c, colWidths[i] - 1)).join('|') + '|');
+    });
+    sanLines.push(sep);
     sanLines.push('');
   });
   zip.file(`산출-${biz}-${dateStr}.txt`, hasSanData ? sanLines.join('\n') : '데이터 없음');

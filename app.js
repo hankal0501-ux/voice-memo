@@ -511,9 +511,12 @@ async function doSaveToDevice(customName) {
 
   const zip = new JSZip();
 
-  // ① 메인 문서 txt
+  // ① 메인 문서 txt (v93 이전 방식)
   const { title, text } = buildTxtContent();
-  zip.file(`${biz}.txt`, text);
+  zip.file(`${biz}-${dateStr}.txt`, text);
+
+  // 7.변환저장 폴더 (PDF/HWP 변환 결과물 저장용)
+  zip.folder('7.변환저장');
 
   // ② 사진 폴더 - 모든 페이지에서 수집
   const photoIds = [];

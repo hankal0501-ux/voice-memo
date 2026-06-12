@@ -1249,53 +1249,59 @@ document.getElementById('photoModalClose').addEventListener('click', () => {
 });
 
 async function handlePhotoFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const files = Array.from(e.target.files || []);
+  if (files.length === 0) return;
 
-  // 용량 체크 (원본 10MB 초과 시 경고)
-  if (file.size > 10 * 1024 * 1024) {
-    showToast('❌ 10MB 이하 사진만 가능합니다.', 'error');
+  const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
+  if (!cell) {
+    showToast('❌ 먼저 셀을 선택해주세요.', 'error');
     e.target.value = '';
     return;
   }
 
-  showToast('📷 사진 처리 중...');
-  const compressed = await compressImage(file, 600, 0.7);
+  let successCount = 0;
+  for (const file of files) {
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('❌ 10MB 초과 사진 건너뜀', 'error');
+      continue;
+    }
+    showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
+    const compressed = await compressImage(file, 600, 0.7);
 
-  const id = Date.now().toString();
-  const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
-  localStorage.setItem('imgCounter', imgCounter);
-  const imgName = String(imgCounter);
+    const id = Date.now().toString() + '_' + successCount;
+    const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
+    localStorage.setItem('imgCounter', imgCounter);
+    const imgName = String(imgCounter);
 
-  // 이미지를 localStorage에 저장 (ZIP 내보내기/다른 PC 호환)
-  let saved = false;
-  try {
-    localStorage.setItem('img_' + id, compressed);
-    localStorage.setItem('img_name_' + id, imgName);
-    saved = true;
-  } catch (err) {
-    // 용량 부족 → ZIP 자동 백업 후 새로 시작
-    await autoBackupAndReset();
+    let saved = false;
     try {
       localStorage.setItem('img_' + id, compressed);
       localStorage.setItem('img_name_' + id, imgName);
       saved = true;
-    } catch (err2) {
-      showToast('❌ 저장 실패: ' + (err2.message || ''), 'error');
-      e.target.value = '';
-      return;
+    } catch (err) {
+      await autoBackupAndReset();
+      try {
+        localStorage.setItem('img_' + id, compressed);
+        localStorage.setItem('img_name_' + id, imgName);
+        saved = true;
+      } catch (err2) {
+        showToast('❌ 저장 실패: ' + (err2.message || ''), 'error');
+        break;
+      }
     }
+    if (!saved) break;
+
+    // 셀에 사진 추가 (기존 내용 유지하면서 append)
+    const tmp = document.createElement('span');
+    tmp.innerHTML = makeCellImg(id, compressed, imgName);
+    cell.appendChild(tmp.firstChild);
+    cell.appendChild(document.createTextNode(' '));
+    successCount++;
   }
-  if (!saved) { e.target.value = ''; return; }
 
-  const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
-  if (!cell) { showToast('❌ 먼저 셀을 선택해주세요.', 'error'); return; }
-
-  cell.contentEditable = 'false';
-  cell.innerHTML = makeCellImg(id, compressed, imgName);
   bindImgClick();
   scheduleAutoSave();
-  showToast(`✅ 사진 ${imgName} 삽입 완료`);
+  if (successCount > 0) showToast(`✅ 사진 ${successCount}장 삽입 완료`);
   e.target.value = '';
 }
 document.getElementById('photoInput').addEventListener('change', handlePhotoFile);

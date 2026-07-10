@@ -126,54 +126,40 @@ async function restoreOnLoad() {
   loadFromStorage(); // fallback
 }
 
-// 기존 IndexedDB의 이미지를 localStorage로 마이그레이션 (1회성)
-async function migrateImagesToLocalStorage() {
-  if (localStorage.getItem('imgMigratedV1')) return;
+// 사진 읽기: IndexedDB 우선, 구버전 localStorage fallback
+async function getImage(id) {
   try {
-    const d = await openDb();
-    const tx = d.transaction('images', 'readonly');
-    const store = tx.objectStore('images');
-    const req = store.openCursor();
-    const migrated = [];
-    await new Promise((resolve) => {
-      req.onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          const id = cursor.key;
-          const val = cursor.value || {};
-          if (val.src && !localStorage.getItem('img_' + id)) {
-            try {
-              localStorage.setItem('img_' + id, val.src);
-              if (val.name) localStorage.setItem('img_name_' + id, val.name);
-              migrated.push(id);
-            } catch (err) {
-              console.warn('localStorage 한도 초과, 마이그레이션 중단:', err);
-              resolve();
-              return;
-            }
-          }
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      req.onerror = () => resolve();
+    const val = await idbGet('images', id);
+    if (val && val.src) return { src: val.src, name: val.name || '' };
+  } catch {}
+  return {
+    src: localStorage.getItem('img_' + id) || '',
+    name: localStorage.getItem('img_name_' + id) || ''
+  };
+}
+
+// 기존 localStorage의 이미지를 IndexedDB로 마이그레이션 (1회성)
+async function migrateImagesToIdb() {
+  if (localStorage.getItem('imgMigratedV2')) return;
+  try {
+    const ids = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('img_') && !k.startsWith('img_name_')) ids.push(k.slice(4));
+    }
+    for (const id of ids) {
+      const src = localStorage.getItem('img_' + id);
+      if (!src) continue;
+      await idbSet('images', id, { src, name: localStorage.getItem('img_name_' + id) || '' });
+    }
+    // IDB 기록이 끝난 뒤에만 localStorage에서 제거
+    ids.forEach(id => {
+      localStorage.removeItem('img_' + id);
+      localStorage.removeItem('img_name_' + id);
     });
-    localStorage.setItem('imgMigratedV1', '1');
-    if (migrated.length > 0) {
-      console.log(`✅ 사진 ${migrated.length}장을 localStorage로 마이그레이션 완료`);
-      // 옮긴 사진은 IDB에서 삭제 (메모리 절약)
-      try {
-        const d2 = await openDb();
-        const tx2 = d2.transaction('images', 'readwrite');
-        const store2 = tx2.objectStore('images');
-        migrated.forEach(id => store2.delete(id));
-        await new Promise((res) => { tx2.oncomplete = res; tx2.onerror = res; });
-        console.log(`🗑️ IndexedDB에서 옮긴 사진 ${migrated.length}장 정리 완료`);
-      } catch (cleanupErr) {
-        console.warn('IDB 정리 실패:', cleanupErr);
-      }
-      // 화면 다시 그리기
+    localStorage.setItem('imgMigratedV2', '1');
+    if (ids.length > 0) {
+      console.log(`✅ 사진 ${ids.length}장을 IndexedDB로 이전 완료`);
       await loadPageRows(pageData[currentPage] || []);
     }
   } catch (e) {
@@ -183,7 +169,7 @@ async function migrateImagesToLocalStorage() {
 
 (async () => {
   await restoreOnLoad();
-  await migrateImagesToLocalStorage();
+  await migrateImagesToIdb();
 })();
 
 // ── 자동저장 표시 ──
@@ -399,13 +385,12 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
         const src = 'data:image/jpeg;base64,' + base64;
         // 파일명에서 id 추출 (이름_1234567890.jpg)
         const fileName = path.split('/').pop();
-        const match = fileName.match(/_(\d{13})\.jpg$/i);
+        const match = fileName.match(/_(\d{13}(?:_\d+)?)\.jpg$/i);
         if (!match) continue;
         const id = match[1];
-        const name = fileName.replace(/_(\d{13})\.jpg$/i, '');
+        const name = fileName.replace(/_(\d{13}(?:_\d+)?)\.jpg$/i, '');
         try {
-          localStorage.setItem('img_' + id, src);
-          if (name) localStorage.setItem('img_name_' + id, name);
+          await idbSet('images', id, { src, name });
           photoMap[id] = src;
         } catch (err) {
           storageFull = true;
@@ -424,14 +409,14 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
           break;
         }
       }
-      if (txtContent) loadTxtContent(txtContent);
+      if (txtContent) await loadTxtContent(txtContent);
       showToast(`✅ 불러오기 완료 (사진 ${Object.keys(photoMap).length}장)`);
 
     } else {
       // ── TXT 불러오기 ──
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        loadTxtContent(ev.target.result);
+      reader.onload = async (ev) => {
+        await loadTxtContent(ev.target.result);
         showToast('✅ 불러오기 완료');
       };
       reader.readAsText(file);
@@ -441,26 +426,28 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
   }
 });
 
-function loadTxtContent(text) {
+async function loadTxtContent(text) {
   const lines = text.split('\n');
   const title = lines[0].replace('제목:', '').trim();
   if (title) document.getElementById('docName').textContent = title;
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
-  lines.slice(2).forEach(line => {
-    if (!line.trim()) return;
-    const cells = line.split('\t');
+  for (const line of lines.slice(2)) {
+    if (!line.trim()) continue;
     const tr = document.createElement('tr');
-    tr.innerHTML = cells.map(cell => {
+    const cells = [];
+    for (const cell of line.split('\t')) {
       if (cell.startsWith('__IMG__')) {
         const id = cell.replace('__IMG__', '');
-        const src = localStorage.getItem('img_' + id) || '';
-        return `<td contenteditable="false" style="text-align:center">${makeCellImg(id, src)}</td>`;
+        const img = await getImage(id);
+        cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, img.src, img.name)}</td>`);
+      } else {
+        cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
       }
-      return `<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`;
-    }).join('');
+    }
+    tr.innerHTML = cells.join('');
     tbody.appendChild(tr);
-  });
+  }
   bindImgClick();
   saveToStorage();
 }
@@ -535,18 +522,7 @@ async function doSaveToDevice(customName) {
     let missingCount = 0;
     for (let idx = 0; idx < photoIds.length; idx++) {
       const id = photoIds[idx];
-      let src = localStorage.getItem('img_' + id) || '';
-      let name = localStorage.getItem('img_name_' + id) || '';
-      // localStorage에 없으면 IndexedDB fallback (마이그레이션 실패 대비)
-      if (!src) {
-        try {
-          const imgData = await idbGet('images', id);
-          if (imgData && imgData.src) {
-            src = imgData.src;
-            if (!name && imgData.name) name = imgData.name;
-          }
-        } catch {}
-      }
+      const { src, name } = await getImage(id);
       if (!src) { missingCount++; continue; }
       const base64 = src.replace(/^data:image\/\w+;base64,/, '');
       folder.file(`${name || ('photo_' + (idx + 1))}_${id}.jpg`, base64, { base64: true });
@@ -899,18 +875,7 @@ async function loadPageRows(rows) {
     for (const cell of row) {
       if (typeof cell === 'string' && cell.startsWith('__IMG__')) {
         const id = cell.replace('__IMG__', '');
-        let src = localStorage.getItem('img_' + id) || '';
-        let name = localStorage.getItem('img_name_' + id) || '';
-        // localStorage에 없으면 IndexedDB fallback (마이그레이션 실패 대비)
-        if (!src) {
-          try {
-            const imgData = await idbGet('images', id);
-            if (imgData && imgData.src) {
-              src = imgData.src;
-              if (!name && imgData.name) name = imgData.name;
-            }
-          } catch {}
-        }
+        const { src, name } = await getImage(id);
         cells.push(`<td contenteditable="false" style="text-align:center">${makeCellImg(id, src, name || '사진')}</td>`);
       } else {
         cells.push(`<td contenteditable="true" inputmode="text" autocorrect="on" autocapitalize="sentences" spellcheck="true">${cell}</td>`);
@@ -1071,7 +1036,7 @@ function showRecordingIndicator(on) {
 // 사진 삽입
 // ════════════════════════════════════
 function makeCellImg(id, src, name) {
-  const label = name || localStorage.getItem('img_name_' + id) || '사진';
+  const label = name || '사진';
   return `<span class="cell-photo-icon" data-img-id="${id}" data-img-src="${src}" data-img-name="${label}" title="${label}">📷 <span class="photo-name">${label}</span></span>`;
 }
 
@@ -1092,6 +1057,24 @@ document.getElementById('imgModal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('imgModal'))
     document.getElementById('imgModal').classList.remove('open');
 });
+
+// 촬영 원본을 폰 저장소(다운로드 폴더)에 그대로 내려받기
+function saveToPhone(file, imgName) {
+  try {
+    const docName = document.getElementById('docName').textContent.trim() || '메모';
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = `${docName}_${imgName}_${stamp}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (err) {
+    console.warn('폰 저장 실패:', err);
+  }
+}
 
 function compressImage(file, maxPx, quality) {
   return new Promise((resolve) => {
@@ -1134,6 +1117,9 @@ async function handlePhotoFile(e) {
   const files = Array.from(e.target.files || []);
   if (files.length === 0) return;
 
+  // 갤러리에서 고른 사진은 이미 폰에 있으므로 촬영분만 내려받는다
+  const fromCamera = e.target.id === 'photoInput';
+
   const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
   if (!cell) {
     showToast('❌ 먼저 셀을 선택해주세요.', 'error');
@@ -1148,30 +1134,26 @@ async function handlePhotoFile(e) {
       continue;
     }
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
-    const compressed = await compressImage(file, 600, 0.7);
+    const compressed = await compressImage(file, 1600, 0.9);
 
     const id = Date.now().toString() + '_' + successCount;
     const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
     localStorage.setItem('imgCounter', imgCounter);
     const imgName = String(imgCounter);
 
-    let saved = false;
     try {
-      localStorage.setItem('img_' + id, compressed);
-      localStorage.setItem('img_name_' + id, imgName);
-      saved = true;
+      await idbSet('images', id, { src: compressed, name: imgName });
     } catch (err) {
-      await autoBackupAndReset();
-      try {
-        localStorage.setItem('img_' + id, compressed);
-        localStorage.setItem('img_name_' + id, imgName);
-        saved = true;
-      } catch (err2) {
-        showToast('❌ 저장 실패: ' + (err2.message || ''), 'error');
-        break;
+      if (err && err.name === 'QuotaExceededError') {
+        await autoBackupAndReset();
+        showToast('❌ 기기 저장공간 부족: 백업 후 새 문서로 시작합니다', 'error');
+      } else {
+        showToast('❌ 저장 실패: ' + (err.message || ''), 'error');
       }
+      break;
     }
-    if (!saved) break;
+
+    if (fromCamera) saveToPhone(file, imgName);
 
     // 셀에 사진 추가 (기존 내용 유지하면서 append)
     const tmp = document.createElement('span');

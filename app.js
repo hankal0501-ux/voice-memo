@@ -1129,18 +1129,24 @@ async function handlePhotoFile(e) {
 
   let successCount = 0;
   for (const file of files) {
+    const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
+    localStorage.setItem('imgCounter', imgCounter);
+    const imgName = String(imgCounter);
+
+    // 촬영 원본은 크기·압축과 무관하게 찍힌 그대로 폰에 저장한다
+    if (fromCamera) saveToPhone(file, imgName);
+
+    // 초대용량은 canvas 디코딩에서 메모리가 터지므로 앱 사본만 건너뛴다
     if (file.size > 10 * 1024 * 1024) {
-      showToast('❌ 10MB 초과 사진 건너뜀', 'error');
+      showToast('⚠️ 10MB 초과: 폰에만 저장되고 앱에는 삽입되지 않습니다', 'error');
       continue;
     }
+
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
     // 앱/PDF용 축소본. 원본은 saveToPhone()이 폰에 그대로 저장한다.
     const compressed = await compressImage(file, 1000, 0.8);
 
     const id = Date.now().toString() + '_' + successCount;
-    const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
-    localStorage.setItem('imgCounter', imgCounter);
-    const imgName = String(imgCounter);
 
     try {
       await idbSet('images', id, { src: compressed, name: imgName });
@@ -1153,8 +1159,6 @@ async function handlePhotoFile(e) {
       }
       break;
     }
-
-    if (fromCamera) saveToPhone(file, imgName);
 
     // 셀에 사진 추가 (기존 내용 유지하면서 append)
     const tmp = document.createElement('span');

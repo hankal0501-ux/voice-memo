@@ -1145,8 +1145,9 @@ async function handlePhotoFile(e) {
     }
 
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
-    // 앱/PDF용 축소본. 원본은 saveToPhone()이 폰에 그대로 저장한다.
-    const { dataURL: compressed, srcW, srcH } = await compressImage(file, 1000, 0.8);
+    // ZIP 사진/ 폴더용 고화질 축소본. PDF 삽입용 축소는 변환기가 따로 한다.
+    // 촬영 원본은 saveToPhone()이 폰에 그대로 저장한다.
+    const { dataURL: compressed, srcW, srcH } = await compressImage(file, 1600, 0.9);
 
     // 카메라가 넘겨준 원본이 실제로 몇 픽셀·몇 KB인지 확인용
     if (fromCamera) {

@@ -1076,13 +1076,15 @@ function saveToPhone(file, imgName) {
   }
 }
 
+// { dataURL, srcW, srcH } 반환. srcW/srcH 는 압축 전 원본 해상도.
 function compressImage(file, maxPx, quality) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const image = new Image();
       image.onload = () => {
-        let w = image.width, h = image.height;
+        const srcW = image.width, srcH = image.height;
+        let w = srcW, h = srcH;
         if (w > maxPx || h > maxPx) {
           if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
           else       { w = Math.round(w * maxPx / h); h = maxPx; }
@@ -1090,7 +1092,7 @@ function compressImage(file, maxPx, quality) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(image, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        resolve({ dataURL: canvas.toDataURL('image/jpeg', quality), srcW, srcH });
       };
       image.src = e.target.result;
     };
@@ -1128,6 +1130,7 @@ async function handlePhotoFile(e) {
   }
 
   let successCount = 0;
+  let lastOrig = null;
   for (const file of files) {
     const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
     localStorage.setItem('imgCounter', imgCounter);
@@ -1144,7 +1147,13 @@ async function handlePhotoFile(e) {
 
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
     // 앱/PDF용 축소본. 원본은 saveToPhone()이 폰에 그대로 저장한다.
-    const compressed = await compressImage(file, 1000, 0.8);
+    const { dataURL: compressed, srcW, srcH } = await compressImage(file, 1000, 0.8);
+
+    // 카메라가 넘겨준 원본이 실제로 몇 픽셀·몇 KB인지 확인용
+    if (fromCamera) {
+      lastOrig = `${srcW}×${srcH}, ${Math.round(file.size / 1024)}KB`;
+      console.log('[촬영 원본]', { w: srcW, h: srcH, bytes: file.size, type: file.type });
+    }
 
     const id = Date.now().toString() + '_' + successCount;
 
@@ -1170,7 +1179,11 @@ async function handlePhotoFile(e) {
 
   bindImgClick();
   scheduleAutoSave();
-  if (successCount > 0) showToast(`✅ 사진 ${successCount}장 삽입 완료`);
+  if (successCount > 0) {
+    showToast(lastOrig
+      ? `✅ ${successCount}장 삽입 · 촬영원본 ${lastOrig}`
+      : `✅ 사진 ${successCount}장 삽입 완료`);
+  }
   e.target.value = '';
 }
 document.getElementById('photoInput').addEventListener('change', handlePhotoFile);

@@ -1136,11 +1136,10 @@ async function handlePhotoFile(e) {
     localStorage.setItem('imgCounter', imgCounter);
     const imgName = String(imgCounter);
 
-    // 촬영 원본은 크기·압축과 무관하게 찍힌 그대로 폰에 저장한다
-    if (fromCamera) saveToPhone(file, imgName);
-
-    // 초대용량은 canvas 디코딩에서 메모리가 터지므로 앱 사본만 건너뛴다
+    // 초대용량은 canvas 디코딩에서 메모리가 터지므로 앱 사본만 건너뛴다.
+    // 이 경우에도 촬영 원본은 폰에 그대로 저장한다.
     if (file.size > 10 * 1024 * 1024) {
+      if (fromCamera) saveToPhone(file, imgName);
       showToast('⚠️ 10MB 초과: 폰에만 저장되고 앱에는 삽입되지 않습니다', 'error');
       continue;
     }
@@ -1175,6 +1174,9 @@ async function handlePhotoFile(e) {
     cell.appendChild(tmp.firstChild);
     cell.appendChild(document.createTextNode(' '));
     successCount++;
+
+    // 앱에 먼저 보이게 한 뒤 원본을 폰에 저장 (다운로드 알림이 뒤에 뜨도록)
+    if (fromCamera) saveToPhone(file, imgName);
   }
 
   bindImgClick();

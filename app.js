@@ -1058,24 +1058,6 @@ document.getElementById('imgModal').addEventListener('click', (e) => {
     document.getElementById('imgModal').classList.remove('open');
 });
 
-// 촬영 원본을 폰 저장소(다운로드 폴더)에 그대로 내려받기
-function saveToPhone(file, imgName) {
-  try {
-    const docName = document.getElementById('docName').textContent.trim() || '메모';
-    const d = new Date();
-    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(file);
-    a.download = `${docName}_${imgName}_${stamp}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  } catch (err) {
-    console.warn('폰 저장 실패:', err);
-  }
-}
-
 // { dataURL, srcW, srcH } 반환. srcW/srcH 는 압축 전 원본 해상도.
 function compressImage(file, maxPx, quality) {
   return new Promise((resolve) => {
@@ -1119,7 +1101,7 @@ async function handlePhotoFile(e) {
   const files = Array.from(e.target.files || []);
   if (files.length === 0) return;
 
-  // 갤러리에서 고른 사진은 이미 폰에 있으므로 촬영분만 내려받는다
+  // 촬영분에만 원본 해상도·용량을 완료 토스트에 표시한다
   const fromCamera = e.target.id === 'photoInput';
 
   const cell = lastFocusedCell || document.querySelector('td[contenteditable]');
@@ -1136,17 +1118,14 @@ async function handlePhotoFile(e) {
     localStorage.setItem('imgCounter', imgCounter);
     const imgName = String(imgCounter);
 
-    // 초대용량은 canvas 디코딩에서 메모리가 터지므로 앱 사본만 건너뛴다.
-    // 이 경우에도 촬영 원본은 폰에 그대로 저장한다.
+    // 초대용량은 canvas 디코딩에서 메모리가 터지므로 건너뛴다
     if (file.size > 10 * 1024 * 1024) {
-      if (fromCamera) saveToPhone(file, imgName);
-      showToast('⚠️ 10MB 초과: 폰에만 저장되고 앱에는 삽입되지 않습니다', 'error');
+      showToast('❌ 10MB 초과 사진 건너뜀', 'error');
       continue;
     }
 
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
     // ZIP 사진/ 폴더용 고화질 축소본. PDF 삽입용 축소는 변환기가 따로 한다.
-    // 촬영 원본은 saveToPhone()이 폰에 그대로 저장한다.
     const { dataURL: compressed, srcW, srcH } = await compressImage(file, 2560, 0.95);
 
     // 카메라가 넘겨준 원본이 실제로 몇 픽셀·몇 KB인지 확인용
@@ -1175,9 +1154,6 @@ async function handlePhotoFile(e) {
     cell.appendChild(tmp.firstChild);
     cell.appendChild(document.createTextNode(' '));
     successCount++;
-
-    // 앱에 먼저 보이게 한 뒤 원본을 폰에 저장 (다운로드 알림이 뒤에 뜨도록)
-    if (fromCamera) saveToPhone(file, imgName);
   }
 
   bindImgClick();

@@ -1134,7 +1134,8 @@ async function handlePhotoFile(e) {
       continue;
     }
     showToast(`📷 사진 처리 중... (${successCount + 1}/${files.length})`);
-    const compressed = await compressImage(file, 1600, 0.9);
+    // 앱/PDF용 축소본. 원본은 saveToPhone()이 폰에 그대로 저장한다.
+    const compressed = await compressImage(file, 1000, 0.8);
 
     const id = Date.now().toString() + '_' + successCount;
     const imgCounter = (parseInt(localStorage.getItem('imgCounter') || '0')) + 1;
